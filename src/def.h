@@ -9,7 +9,7 @@ namespace bigbang {
 template <typename T>
 class Functional
 {
-public :
+public:
   virtual ~Functional() {}
   virtual size_t Nx() const = 0;
   virtual int Val(const T *x, T *val) const = 0;
@@ -27,19 +27,18 @@ public :
 template <typename T>
 class Constraint
 {
-public :
+public:
   virtual ~Constraint() {}
   virtual size_t Nx() const = 0;
   virtual size_t Nf() const = 0;
   virtual int Val(const T *x, T *val) const = 0;
-  virtual int Jac(const T *x, const size_t off,
-                  std::vector<Eigen::Triplet<T>> *jac) const = 0;
+  virtual int Jac(const T *x, const size_t off, std::vector<Eigen::Triplet<T>> *jac) const = 0;
 };
 
 template <typename T>
 class energy_t : public Functional<T>
 {
-public :
+public:
   class null_input_exception : public std::exception {
   public :
     const char* what() const throw() {
@@ -104,7 +103,7 @@ protected:
 template <typename T>
 class constraint_t : public Constraint<T>
 {
-public :
+public:
   class null_input_exception : std::exception {
   public :
     const char* what() const throw() {
@@ -146,21 +145,21 @@ public :
   }
   int Val(const T *x, T *val) const {
     Eigen::Map<Eigen::Matrix<T, -1, 1>> v(val, Nf());
-    size_t off = 0;
+    size_t offset = 0;
     for (auto &c : buffer_) {
       if ( c.get() ) {
         const size_t nf = c->Nf();
         Eigen::Matrix<T, -1, 1> value(nf);
         value.setZero();
         c->Val(x, value.data());
-        v.segment(off, nf) += value;
-        off += nf;
+        v.segment(offset, nf) += value;
+        offset += nf;
       }
     }
     return 0;
   }
   int Jac(const T *x, const size_t off, std::vector<Eigen::Triplet<T>> *jac) const {
-    size_t offset = 0;
+    size_t offset = off;
     for (auto &c : buffer_) {
       if ( c.get() ) {
         c->Jac(x, offset, jac);
@@ -177,4 +176,3 @@ protected :
 }
 
 #endif // NUMERIC_DEF_H
-
