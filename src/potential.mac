@@ -1,0 +1,28 @@
+load(vect)$
+load(eigen)$
+load(hj_fortran2)$
+
+optimprefix: tt$
+
+f: openw("potential.f90")$
+
+block(
+  [X, D, vol, lam, miu],
+  X: genmatrix(X, 3, 4),      /* [x2-x1, x3-x1, x4-x1] */
+  D: genmatrix(D, 3, 3),      /* [X2-X1, X3-X1, X4-X1]^{-1} */
+  vol: genmatrix(vol, 1, 1),  /* volume of tet */
+  lam: genmatrix(lam, 1, 1),  /* lame coeffecients for isotropic materials */
+  miu: genmatrix(miu, 1, 1),  /* ... */
+  
+  linear_tet_energy(X, D, vol) := block(
+    [DS, F, eps],
+    DS: addcol(col(X, 2)-col(X, 1), col(X, 3)-col(X, 1), col(X, 4)-col(X, 1)),
+    F: DS.D,
+    eps: 0.5*(transpose(F)+F)-ident(3),
+    /* \int e_{ij}C_{ijkl}e_{kl} dV*/
+  ),
+  with_stdout(f, ),
+  return()
+)$
+
+close(f)$
