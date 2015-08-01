@@ -10,4 +10,9 @@ add_custom_command(OUTPUT potential.f90
     DEPENDS potential.mac
 )
 
+add_custom_command(OUTPUT pbd_constraint.f90
+    COMMAND "maxima" ARGS --userdir=${SRC_DIR} -b pbd_constraint.mac
+    DEPENDS pbd_constraint.mac
+)
+
 add_library(bigbang SHARED ${header} ${source} potential.f90)

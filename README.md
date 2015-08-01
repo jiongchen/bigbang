@@ -1,4 +1,4 @@
- # The Big Bang #
+#The Big Bang#
 
 This is going to be my spare-time project which will involve implementations of some classical and interesting papers in physically based simulation. 
 
