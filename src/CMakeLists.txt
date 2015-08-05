@@ -10,9 +10,12 @@ add_custom_command(OUTPUT potential.f90
     DEPENDS potential.mac
 )
 
-add_custom_command(OUTPUT pbd_constraint.f90
+add_custom_command(OUTPUT pbd_cons.f90
     COMMAND "maxima" ARGS --userdir=${SRC_DIR} -b pbd_constraint.mac
     DEPENDS pbd_constraint.mac
 )
 
-add_library(bigbang SHARED ${header} ${source} potential.f90)
+add_library(bigbang SHARED ${header} ${source} potential.f90 pbd_cons.f90)
+target_link_libraries(bigbang
+    jtf-mesh
+)

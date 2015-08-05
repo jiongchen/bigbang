@@ -1,0 +1,35 @@
+load(cj_function)$
+load(hj_fortran2)$
+
+optimprefix: tt$
+
+f: openw("pbd_cons.f90")$
+
+block(
+  [X],
+  X: genmatrix(X, 3, 2),
+  calc_stretch(X) := block(
+    matrix([NORM(col(X,1)-col(X, 2))])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(calc_stretch, [X]))
+)$
+
+block(
+  [X],
+  X: genmatrix(X, 3, 4),
+  calc_bend(X) := block(
+    [p1, p2, p3, p4, n1, n2],
+    p1: col(X, 2),
+    p2: col(X, 3),
+    p3: col(X, 1),
+    p4: col(X, 4),
+    n1: CROSS(p2-p1, p3-p1),
+    n1: n1/NORM(n1),
+    n2: CROSS(p2-p1, p4-p1),
+    n2: n2/NORM(n2),
+    matrix([acos(DOT(n1, n2))])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(calc_bend, [X]))
+)$
+
+close(f)$

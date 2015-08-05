@@ -1,8 +1,12 @@
 #include "pbd_cloth.h"
 
 #include <jtflib/mesh/mesh.h>
+#include <jtflib/mesh/io.h>
+#include <zjucad/matrix/io.h>
 
 #include "def.h"
+#include "vtk.h"
+#include "mass_matrix.h"
 
 using namespace std;
 using namespace zjucad::matrix;
@@ -15,16 +19,25 @@ namespace bigbang {
 
 extern "C" {
 
-void calc_streth_(double *val, const double *x);
-void calc_streth_jac_(double *jac, const double *x);
+void calc_stretch_(double *val, const double *x);
+void calc_stretch_jac_(double *jac, const double *x);
 
 void calc_bend_(double *val, const double *x);
 void calc_bend_jac_(double *jac, const double *x);
 
 }
 
-void get_dihedral_elements(const mati_t &tris, mati_t &ele)
-{
+void get_edge_elements(const mati_t &tris, mati_t &ele) {
+  unique_ptr<edge2cell_adjacent> ea(edge2cell_adjacent::create(tris, false));
+  ele.resize(2, ea->edges_.size());
+#pragma omp parallel for
+  for (size_t i = 0; i < ele.size(2); ++i) {
+    ele(0, i) = ea->edges_[i].first;
+    ele(1, i) = ea->edges_[i].second;
+  }
+}
+
+void get_dihedral_elements(const mati_t &tris, mati_t &ele) {
   unique_ptr<edge2cell_adjacent> ea(edge2cell_adjacent::create(tris, false));
   mati_t bd_ed_id;
   get_boundary_edge_idx(*ea, bd_ed_id);
@@ -54,34 +67,41 @@ void get_dihedral_elements(const mati_t &tris, mati_t &ele)
 class constraint_piece
 {
 public:
-  virtual ~constraint_piece();
-  virtual size_t dim() const;
-  virtual int eval_val(const double *x, double *val) const;
-  virtual int eval_jac(const double *x, double *jac) const;
+  enum cons_type {
+    EQUAL,
+    GREATER
+  };
+  constraint_piece(const mati_t &pn, const double k, const cons_type type) : pn_(pn), k_(k), type_(type) {}
+  virtual ~constraint_piece() {}
+  virtual size_t dim() const = 0;
+  virtual int eval_val(const double *x, double *val) const = 0;
+  virtual int eval_jac(const double *x, double *jac) const = 0;
   const mati_t pn_;
+  const double k_;
+  const cons_type type_;
 };
 
 class stretch_cons : public constraint_piece
 {
 public:
-  stretch_cons(const mati_t &edge, const matd_t &nods)
-    : pn_(edge), dim_(nods.size()), len_(0.0) {
+  stretch_cons(const mati_t &edge, const matd_t &nods, const double k, const cons_type type=EQUAL)
+    : dim_(nods.size()), len_(0.0), constraint_piece(edge, k, type) {
     matd_t X = nods(colon(), pn_);
-    calc_streth_(&len_, &X[0]);
+    calc_stretch_(&len_, &X[0]);
   }
   size_t dim() const {
-    return dim_;;
+    return dim_;
   }
   int eval_val(const double *x, double *val) const {
     matd_t X = itr_matrix<const double*>(3, dim_/3, x)(colon(), pn_);
     double curr_len = 0;
-    calc_streth_(&curr_len, &X[0]);
+    calc_stretch_(&curr_len, &X[0]);
     *val = curr_len-len_;
     return 0;
   }
   int eval_jac(const double *x, double *jac) const {
     matd_t X = itr_matrix<const double*>(3, dim_/3, x)(colon(), pn_);
-    calc_streth_jac_(jac, &X[0]);
+    calc_stretch_jac_(jac, &X[0]);
     return 0;
   }
 private:
@@ -92,8 +112,8 @@ private:
 class bend_cons : public constraint_piece
 {
 public:
-  bend_cons(const mati_t &dias, const matd_t &nods)
-    : pn_(dias), dim_(nods.size()), dih_(0.0) {
+  bend_cons(const mati_t &dia, const matd_t &nods, const double k, const cons_type type=EQUAL)
+    : dim_(nods.size()), dih_(0.0), constraint_piece(dia, k, type) {
     matd_t X = nods(colon(), pn_);
     calc_bend_(&dih_, &X[0]);
   }
@@ -117,36 +137,82 @@ private:
   double dih_;
 };
 
-class constraint_collector
-{
-public:
-  enum ConstraintType {
+pbd_cloth_solver::pbd_cloth_solver() {}
 
-  };
-  void operator ()(const mati_t &tris, const matd_t &nods, ConstraintType type) {
+int pbd_cloth_solver::load_model_from_obj(const char *filename) {
+  return jtf::mesh::load_obj(filename, tris_, nods_);
+}
 
-  }
-  vector<shared_ptr<constraint_piece>> buff_;
-private:
-  void add_stretch_cons();
-  void add_bend_cons();
-  void add_collision_cons();
-  mati_t edge_;
-  mati_t dia_;
-};
+int pbd_cloth_solver::save_model_to_obj(const char *filename) const {
+  return jtf::mesh::save_obj(filename, tris_, nods_);
+}
 
-int pbd_cloth_solver::precompute() {
+int pbd_cloth_solver::save_model_to_vtk(const char *filename) const {
+  ofstream os(filename);
+  if ( os.fail() )
+    return __LINE__;
+  tri2vtk(os, nods_.begin(), nods_.size(2), tris_.begin(), tris_.size(2));
   return 0;
 }
 
-int pbd_cloth_solver::project_constraints(vec_t &x) {
+int pbd_cloth_solver::init() {
+  vel_.setZero(nods_.size());
+  fext_.setZero(nods_.size());
+  grav_.setZero(nods_.size());
+}
+
+void pbd_cloth_solver::set_mass_matrix(const double rho) {
+  calc_mass_matrix(tris_, nods_, rho, 3, &M_, true);
+  Minv_.resize(M_.cols());
+  for (size_t i = 0; i < Minv_.size(); ++i)
+    Minv_[i] = 1.0/M_.coeff(i, i);
+}
+
+void pbd_cloth_solver::apply_gravity() {
+
+}
+
+void pbd_cloth_solver::erase_gravity() {
+
+}
+
+void pbd_cloth_solver::attach_vert(const size_t id, const double *pos) {
+  Minv_[3*id+0] = Minv_[3*id+1] = Minv_[3*id+2] = 0.0;
+  if ( pos ) {
+    nods_(0, id) = pos[0];
+    nods_(1, id) = pos[1];
+    nods_(2, id) = pos[2];
+  }
+}
+
+double pbd_cloth_solver::constraint_squared_norm() {
+  matd_t Cv = zeros<double>(buff_.size(), 1);
+#pragma omp parallel for
+  for (size_t i = 0; i < buff_.size(); ++i)
+    buff_[i]->eval_val(&nods_[0], &Cv[i]);
+  return dot(Cv, Cv);
+}
+
+int pbd_cloth_solver::precompute() {
+  // construct constraints with rest configuration
+  add_strecth_constraints(tris_, nods_);
+  add_bend_constraints(tris_, nods_);
+  cout << "[info] constraint number: " << buff_.size() << endl;
+  cout << "[info] C(x)^TC(x): " << constraint_squared_norm() << endl;
+  return 0;
+}
+
+int pbd_cloth_solver::project_constraints(vec_t &x, const size_t iter_num) {
   itr_matrix<double*> X(3, x.rows()/3, x.data());
-  for (auto &co : collect_->buff_) {
+  for (auto &co : buff_) {
     double val = 0.0;
     co->eval_val(&X[0], &val);
-    matd_t jac = zeros<double>(3, co->pn_.size(2));
-    co->eval_jac(&X[0], &jac[0]);
-    X(colon(), co->pn) += dx;
+    if ( co->type_ == constraint_piece::EQUAL ||
+         (co->type_ == constraint_piece::GREATER && val < 0.0) ) {
+      matd_t jac = zeros<double>(3, co->pn_.size(2));
+      co->eval_jac(&X[0], &jac[0]);
+//      X(colon(), co->pn) += dx;
+    }
   }
   return 0;
 }
@@ -154,17 +220,72 @@ int pbd_cloth_solver::project_constraints(vec_t &x) {
 int pbd_cloth_solver::advance() {
   Map<VectorXd> X(nods_.begin(), nods_.size());
   VectorXd Xstar = X;
-  vel += h_*Minv_*fext_;
-  // damp vel;
+  vel_ += h_*Minv_.asDiagonal()*fext_;
+  /// --------------------
+  /// ----damp velocity---
+  /// --------------------
   Xstar += h_*vel_;
-  // generate collision constraints
-
+  /// --------------------
+  /// -gen collision cosn-
+  /// --------------------
   for (size_t i = 0; i < MAX_ITER; ++i) {
-    // project constraints
+    cout << "\t@constaint norm: " << constraint_squared_norm() << endl;
+    project_constraints(Xstar, i);
   }
   vel_ = (Xstar-X)/h_;
   X = Xstar;
-  // velocity update
+  /// --------------------
+  /// --velocity update---
+  /// --------------------
+  return 0;
+}
+
+int pbd_cloth_solver::add_strecth_constraints(const mati_t &tris, const matd_t &nods) {
+  mati_t edge;
+  get_edge_elements(tris, edge);
+  for (size_t i = 0; i < edge.size(2); ++i) {
+    buff_.push_back(std::make_shared<stretch_cons>(edge(colon(), i), nods, 1.0));
+  }
+  return 0;
+}
+
+int pbd_cloth_solver::add_bend_constraints(const mati_t &tris, const matd_t &nods) {
+  mati_t dias;
+  get_dihedral_elements(tris, dias);
+  for (size_t i = 0; i < dias.size(2); ++i) {
+    buff_.push_back(std::make_shared<bend_cons>(dias(colon(), i), nods, 1.0));
+  }
+  return 0;
+}
+
+//==============================================================================
+int pbd_cloth_solver::test_calc_length() {
+  const double x[6] = {0,1,0, 1,0,0};
+  double value = 0;
+  calc_stretch_(&value, x);
+  cout << value << endl;
+  return 0;
+}
+
+int pbd_cloth_solver::test_calc_dihedral_angle() {
+  const double x[12] = {0,-1,1, 0,0,0, 1,0,0, 0,1,0};
+  double value = 0;
+  calc_bend_(&value, x);
+  cout << value/M_PI*180 << endl;
+  return 0;
+}
+
+int pbd_cloth_solver::test_edge_extraction() {
+  mati_t edge;
+  get_edge_elements(tris_, edge);
+  cout << edge << endl;
+  return 0;
+}
+
+int pbd_cloth_solver::test_diamond_extraction() {
+  mati_t dias;
+  get_dihedral_elements(tris_, dias);
+  cout << dias << endl;
   return 0;
 }
 

@@ -11,3 +11,9 @@ add_executable(vol2tet vol2tet.cc)
 target_link_libraries(vol2tet
     jtf-mesh
 )
+
+add_executable(test_pbd_cloth test_pbd_cloth.cc)
+target_link_libraries(test_pbd_cloth
+    bigbang
+    ${Boost_LIBRARIES}
+)

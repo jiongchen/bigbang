@@ -6,7 +6,7 @@
 
 namespace bigbang {
 
-class constraint_collector;
+class constraint_piece;
 
 class pbd_cloth_solver
 {
@@ -17,30 +17,40 @@ public:
   using spmat_t = Eigen::SparseMatrix<double>;
   pbd_cloth_solver();
   // io
-  int load_model(const char *filename);
-  int save_model(const char *filename) const;
+  int load_model_from_obj(const char *filename);
+  int save_model_to_obj(const char *filename) const;
+  int save_model_to_vtk(const char *filename) const;
   // config
   int init();
-  int set_density(const double rho);
-  int set_time_step(const double h);
-  int apply_ext_force(const size_t id, const double *force);
-  int apply_gravity();
+  void set_mass_matrix(const double rho);
+  void set_time_step(const double h) { h_ = h; }
+  void apply_ext_force(const size_t id, const double *force);
+  void apply_gravity();
+  void erase_gravity();
+  void attach_vert(const size_t id, const double *pos=nullptr);
   // solve
   int precompute();
-  int set_init_state();
   int advance();
   // debug
+  int test_calc_length();
+  int test_calc_dihedral_angle();
+  int test_edge_extraction();
+  int test_diamond_extraction();
 private:
-  int project_constraints(vec_t &x);
+  int project_constraints(vec_t &x, const size_t iter_num);
+  int add_one_coll_constraint(); /// @todo
+  int add_strecth_constraints(const mati_t &tris, const matd_t &nods);
+  int add_bend_constraints(const mati_t &tris, const matd_t &nods);
+  double constraint_squared_norm();
 
   mati_t tris_;
   matd_t nods_;
-  spmat_t M_, Minv_;
-  vec_t vel_, fext_;
-  double h_;
-//  std::vector<std::shared_ptr<Constraint<double>>> buff_;
-//  std::shared_ptr<Constraint<double>> cons_;
-  std::shared_ptr<constraint_collector> collect_;
+  spmat_t M_;
+  vec_t Minv_;
+  vec_t vel_, fext_, grav_;
+  double h_, rho_;
+  std::vector<std::shared_ptr<constraint_piece>> buff_, coll_;
+
   const size_t MAX_ITER = 10000;
 };
 
