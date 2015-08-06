@@ -147,6 +147,13 @@ int pbd_cloth_solver::save_model_to_obj(const char *filename) const {
   return jtf::mesh::save_obj(filename, tris_, nods_);
 }
 
+int pbd_cloth_solver::load_model_from_vtk(const char *filename) {
+  ifstream is(filename);
+  if ( is.fail() )
+    return __LINE__;
+  return 0;
+}
+
 int pbd_cloth_solver::save_model_to_vtk(const char *filename) const {
   ofstream os(filename);
   if ( os.fail() )
@@ -185,7 +192,7 @@ void pbd_cloth_solver::attach_vert(const size_t id, const double *pos) {
   }
 }
 
-double pbd_cloth_solver::constraint_squared_norm() {
+double pbd_cloth_solver::query_constraint_squared_norm() const {
   matd_t Cv = zeros<double>(buff_.size(), 1);
 #pragma omp parallel for
   for (size_t i = 0; i < buff_.size(); ++i)
@@ -194,11 +201,12 @@ double pbd_cloth_solver::constraint_squared_norm() {
 }
 
 int pbd_cloth_solver::precompute() {
-  // construct constraints with rest configuration
+  /// construct constraints with rest configuration
   add_strecth_constraints(tris_, nods_);
   add_bend_constraints(tris_, nods_);
   cout << "[info] constraint number: " << buff_.size() << endl;
-  cout << "[info] C(x)^TC(x): " << constraint_squared_norm() << endl;
+  cout << "[info] C(x)^TC(x): "
+       << query_constraint_squared_norm() << endl;
   return 0;
 }
 
@@ -229,7 +237,8 @@ int pbd_cloth_solver::advance() {
   /// -gen collision cosn-
   /// --------------------
   for (size_t i = 0; i < MAX_ITER; ++i) {
-    cout << "\t@constaint norm: " << constraint_squared_norm() << endl;
+    cout << "\t@constaint norm: "
+         << query_constraint_squared_norm() << endl;
     project_constraints(Xstar, i);
   }
   vel_ = (Xstar-X)/h_;

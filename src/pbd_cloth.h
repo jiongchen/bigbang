@@ -18,6 +18,7 @@ public:
   pbd_cloth_solver();
   // io
   int load_model_from_obj(const char *filename);
+  int load_model_from_vtk(const char *filename);
   int save_model_to_obj(const char *filename) const;
   int save_model_to_vtk(const char *filename) const;
   // config
@@ -41,7 +42,7 @@ private:
   int add_one_coll_constraint(); /// @todo
   int add_strecth_constraints(const mati_t &tris, const matd_t &nods);
   int add_bend_constraints(const mati_t &tris, const matd_t &nods);
-  double constraint_squared_norm();
+  double query_constraint_squared_norm() const;
 
   mati_t tris_;
   matd_t nods_;
