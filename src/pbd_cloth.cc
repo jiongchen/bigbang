@@ -176,7 +176,10 @@ void pbd_cloth_solver::set_mass_matrix(const double rho) {
 }
 
 void pbd_cloth_solver::apply_gravity() {
-
+#pragma omp parallel for
+  for (size_t i = 0; i < grav_.size()/3; ++i)
+    grav_[3*i+1] = -M_.coeff(3*i, 3*i)*9.81;
+  fext_ += grav_;
 }
 
 void pbd_cloth_solver::erase_gravity() {
@@ -192,21 +195,20 @@ void pbd_cloth_solver::attach_vert(const size_t id, const double *pos) {
   }
 }
 
-double pbd_cloth_solver::query_constraint_squared_norm() const {
+double pbd_cloth_solver::query_constraint_squared_norm(const double *x) const {
   matd_t Cv = zeros<double>(buff_.size(), 1);
 #pragma omp parallel for
-  for (size_t i = 0; i < buff_.size(); ++i)
-    buff_[i]->eval_val(&nods_[0], &Cv[i]);
+  for (size_t i = 0; i < buff_.size(); ++i) {
+    buff_[i]->eval_val(x, &Cv[i]);
+  }
   return dot(Cv, Cv);
 }
 
 int pbd_cloth_solver::precompute() {
   /// construct constraints with rest configuration
   add_strecth_constraints(tris_, nods_);
-  add_bend_constraints(tris_, nods_);
+//  add_bend_constraints(tris_, nods_);
   cout << "[info] constraint number: " << buff_.size() << endl;
-  cout << "[info] C(x)^TC(x): "
-       << query_constraint_squared_norm() << endl;
   return 0;
 }
 
@@ -214,12 +216,20 @@ int pbd_cloth_solver::project_constraints(vec_t &x, const size_t iter_num) {
   itr_matrix<double*> X(3, x.rows()/3, x.data());
   for (auto &co : buff_) {
     double val = 0.0;
-    co->eval_val(&X[0], &val);
-    if ( co->type_ == constraint_piece::EQUAL ||
-         (co->type_ == constraint_piece::GREATER && val < 0.0) ) {
-      matd_t jac = zeros<double>(3, co->pn_.size(2));
+    co->eval_val(x.data(), &val);
+    if ( val == 0.0 )
+      continue;
+    if ( co->type_ == constraint_piece::EQUAL || (co->type_ == constraint_piece::GREATER && val < 0.0) ) {
+      matd_t jac = zeros<double>(3, co->pn_.size());
       co->eval_jac(&X[0], &jac[0]);
-//      X(colon(), co->pn) += dx;
+      double s = 0;
+      for (size_t i = 0; i < co->pn_.size(); ++i)
+        s += Minv_[3*co->pn_[i]]*dot(jac(colon(), i), jac(colon(), i));
+      if ( s == 0.0 )
+        continue;
+      s = val/s;
+      for (size_t i = 0; i < co->pn_.size(); ++i)
+        X(colon(), co->pn_[i]) += -s*Minv_[3*co->pn_[i]]*jac(colon(), i);
     }
   }
   return 0;
@@ -237,8 +247,12 @@ int pbd_cloth_solver::advance() {
   /// -gen collision cosn-
   /// --------------------
   for (size_t i = 0; i < MAX_ITER; ++i) {
-    cout << "\t@constaint norm: "
-         << query_constraint_squared_norm() << endl;
+    double cons_sqr = query_constraint_squared_norm(Xstar.data());
+    cout << "\t@constraint norm: " << cons_sqr << endl;
+    if ( cons_sqr < 1e-8 ) {
+      cout << "\t@converged\n";
+      break;
+    }
     project_constraints(Xstar, i);
   }
   vel_ = (Xstar-X)/h_;

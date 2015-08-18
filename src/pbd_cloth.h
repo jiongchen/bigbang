@@ -42,7 +42,7 @@ private:
   int add_one_coll_constraint(); /// @todo
   int add_strecth_constraints(const mati_t &tris, const matd_t &nods);
   int add_bend_constraints(const mati_t &tris, const matd_t &nods);
-  double query_constraint_squared_norm() const;
+  double query_constraint_squared_norm(const double *x) const;
 
   mati_t tris_;
   matd_t nods_;

@@ -17,6 +17,7 @@ block(
 block(
   [X],
   X: genmatrix(X, 3, 4),
+  /*
   calc_bend(X) := block(
     [p1, p2, p3, p4, n1, n2],
     p1: col(X, 2),
@@ -27,7 +28,19 @@ block(
     n1: n1/NORM(n1),
     n2: CROSS(p2-p1, p4-p1),
     n2: n2/NORM(n2),
-    matrix([acos(DOT(n1, n2))])
+    matrix([ acos(DOT(n1, n2)) ])
+  ),
+  */
+  calc_bend(X) := block(
+    [b1, b2, b3, b1xb2, b2xb3, sintheta, costheta],
+    b1: col(X, 2)-col(X, 1),
+    b2: col(X, 3)-col(X, 2),
+    b3: col(X, 4)-col(X, 3),
+    b1xb2: CROSS(b1, b2),
+    b2xb3: CROSS(b2, b3),
+    sintheta: DOT(CROSS(b1xb2, b2xb3), b2/NORM(b2)),
+    costheta: DOT(b1xb2, b2xb3),
+    matrix([ atan2(sintheta, costheta) ])
   ),
   with_stdout(f, val_jac_hes_to_f90(calc_bend, [X]))
 )$
