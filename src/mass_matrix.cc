@@ -1,5 +1,6 @@
 #include "mass_matrix.h"
 
+#include <iostream>
 #include <hjlib/math/blas_lapack.h>
 #include <zjucad/matrix/lapack.h>
 #include <unsupported/Eigen/KroneckerProduct>

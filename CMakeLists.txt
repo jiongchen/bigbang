@@ -2,6 +2,7 @@ project(bigbang)
 cmake_minimum_required(VERSION 2.8)
 
 list(APPEND CMAKE_CXX_FLAGS "-fopenmp -std=c++11 -fpermissive")
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/;${CMAKE_MODULE_PATH}")
 
 include($ENV{HOME}/usr/share/cmake/Modules/geo_sim_sdk.cmake)
 include_geo_sim_sdk()
