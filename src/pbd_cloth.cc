@@ -12,8 +12,8 @@ using namespace std;
 using namespace zjucad::matrix;
 using namespace jtf::mesh;
 using namespace Eigen;
-using mati_t = matrix<size_t>;
-using matd_t = matrix<double>;
+using mati_t=zjucad::matrix::matrix<size_t>;
+using matd_t=zjucad::matrix::matrix<double>;
 
 namespace bigbang {
 

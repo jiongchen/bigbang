@@ -1,5 +1,5 @@
-#ifndef ELASTIC_VTK_H
-#define ELASTIC_VTK_H
+#ifndef VTK_H
+#define VTK_H
 
 template <typename OS, typename FLOAT, typename INT>
 void line2vtk(

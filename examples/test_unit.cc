@@ -12,6 +12,7 @@
 #include "src/mass_matrix.h"
 #include "src/config.h"
 #include "src/vtk.h"
+#include "src/energy.h"
 
 using namespace std;
 using namespace Eigen;
@@ -87,6 +88,12 @@ int test_mass_matrix(ptree &pt) {
     cout << M << endl;
   }
   cout << "[info] done\n";
+  return 0;
+}
+
+int test_energy(ptree &pt) {
+  shared_ptr<momentum_potential_imp_euler> sol;
+  sol->Nx();
   return 0;
 }
 

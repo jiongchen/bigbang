@@ -6,9 +6,9 @@
 
 namespace bigbang {
 
-using mati_t = zjucad::matrix::matrix<size_t>;
-using matd_t = zjucad::matrix::matrix<double>;
-using spmat_t = Eigen::SparseMatrix<double>;
+using mati_t=zjucad::matrix::matrix<size_t>;
+using matd_t=zjucad::matrix::matrix<double>;
+using spmat_t=Eigen::SparseMatrix<double>;
 
 int calc_mass_matrix(const mati_t &cell,
                      const matd_t &nods,
