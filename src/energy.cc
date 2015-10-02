@@ -1,5 +1,8 @@
 #include "energy.h"
 
+#include <iostream>
+#include <hjlib/math/blas_lapack.h>
+#include <zjucad/matrix/lapack.h>
 #include <zjucad/matrix/itr_matrix.h>
 
 #include "mass_matrix.h"
@@ -29,7 +32,8 @@ void tet_neohookean_hes_(double *hes, const double *x, const double *Dm, const d
 
 }
 //==============================================================================
-momentum_potential_imp_euler::momentum_potential_imp_euler(const mati_t &cell, const matd_t &nods, const double rho, const double h, const double w)
+momentum_potential_imp_euler::momentum_potential_imp_euler(const mati_t &cell, const matd_t &nods,
+                                                           const double rho, const double h, const double w)
   : rho_(rho), h_(h), w_(w), dim_(nods.size()) {
   calc_mass_matrix(cell, nods, rho, nods.size(1), &M_, false);
   xn_ = Map<const VectorXd>(&nods[0], dim_);
@@ -83,7 +87,8 @@ double momentum_potential_imp_euler::QueryKineticEnergy() const {
   return 0.5*vn_.dot(M_*vn_);
 }
 //==============================================================================
-momentum_potential_bdf2::momentum_potential_bdf2(const mati_t &cell, const matd_t &nods, const double rho, const double h, const double w)
+momentum_potential_bdf2::momentum_potential_bdf2(const mati_t &cell, const matd_t &nods,
+                                                 const double rho, const double h, const double w)
   : rho_(rho), h_(h), w_(w), dim_(nods.size()) {
   calc_mass_matrix(cell, nods, rho, cell.size(1), &M_, false);
   xn_ = Map<const VectorXd>(&nods[0], dim_);
@@ -143,7 +148,8 @@ double momentum_potential_bdf2::QueryKineticEnergy() {
   return 0.5*vn_.dot(M_*vn_);
 }
 //==============================================================================
-gravitational_potential::gravitational_potential(const mati_t &cell, const matd_t &nods, const double rho, const double w)
+gravitational_potential::gravitational_potential(const mati_t &cell, const matd_t &nods,
+                                                 const double rho, const double w)
   : dim_(nods.size()), w_(w) {
   calc_mass_matrix(cell, nods, rho, 1, &M_, true);
 }
@@ -169,9 +175,23 @@ int gravitational_potential::Gra(const double *x, double *gra) const {
   return 0;
 }
 //==============================================================================
-elastic_potential::elastic_potential(const mati_t &tets, const matd_t &nods, const double Ym, const double Pr, const double w)
-  : dim_(nods.size()), w_(w) {
-
+elastic_potential::elastic_potential(const mati_t &tets, const matd_t &nods, Material type,
+                                     const double Ym, const double Pr, const double w)
+  : tets_(tets), type_(type), dim_(nods.size()), w_(w) {
+  vol_.resize(1, tets_.size(2));
+  Dm_.resize(9, tets_.size(2));
+#pragma omp parallel for
+  for (size_t i = 0; i < tets_.size(2); ++i) {
+    matd_t edge = nods(colon(), tets_(colon(1, 3), i))-nods(colon(), tets_(0, i))*ones<double>(1, 3);
+    //vol_[i] = fabs(det())/6.0;
+    if ( inv(edge) )
+      cerr << "\tdegenerated tet " << i << endl;
+    std::copy(edge.begin(), edge.end(), &Dm_(0, i));
+  }
+  // calculate \lambda and \miu according
+  // to Young's modulus and Poisson ratio
+  lam_ = Ym*Pr/((1.0+Pr)*(1.0-2.0*Pr));
+  miu_ = Ym/(2.0*(1.0+Pr));
 }
 
 size_t elastic_potential::Nx() const {
@@ -182,19 +202,85 @@ int elastic_potential::Val(const double *x, double *val) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
   itr_matrix<const double*> X(3, dim_/3, x);
   for (size_t i = 0; i < tets_.size(2); ++i) {
-
+    matd_t vert = X(colon(), tets_(colon(), i));
+    double value = 0;
+    switch ( type_ ) {
+      case LINEAR:
+        tet_linear_(&value, &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      case STVK:
+        tet_stvk_(&value, &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      case COROTATIONAL:
+        break;
+      case NEOHOOKEAN:
+        tet_neohookean_(&value, &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      default:
+        break;
+    }
+    *val += w_*value;
   }
   return 0;
 }
 
 int elastic_potential::Gra(const double *x, double *gra) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < tets_.size(2); ++i) {
+    matd_t vert = X(colon(), tets_(colon(), i));
+    matd_t grad = zeros<double>(3, 4);
+    switch ( type_ ) {
+      case LINEAR:
+        tet_linear_jac_(&grad[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      case STVK:
+        tet_stvk_jac_(&grad[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      case COROTATIONAL:
+        break;
+      case NEOHOOKEAN:
+        tet_neohookean_jac_(&grad[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+      default:
+        break;
+    }
+    G(colon(), tets_(colon(), i)) += w_*grad;
+  }
   return 0;
 }
 
 int elastic_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tets_.size(2); ++i) {
+    matd_t vert = X(colon(), tets_(colon(), i));
+    matd_t H = zeros<double>(12, 12);
+    switch ( type_ ) {
+      case LINEAR:
+        tet_linear_hes_(&H[0], nullptr, &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      case STVK:
+        tet_stvk_hes_(&H[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      case COROTATIONAL:
+        break;
+      case NEOHOOKEAN:
+        tet_neohookean_(&H[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
+        break;
+      default:
+        break;
+    }
+    for (size_t p = 0; p < 12; ++p) {
+      for (size_t q = 0; q < 12; ++q) {
+        const size_t I = 3*tets_(p/3, i)+p%3;
+        const size_t J = 3*tets_(q/3, i)+q%3;
+        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
   return 0;
 }
 //==============================================================================
+
 }

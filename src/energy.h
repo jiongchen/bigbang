@@ -52,7 +52,13 @@ private:
 class elastic_potential : public Functional<double>
 {
 public:
-  elastic_potential(const mati_t &tets, const matd_t &nods, const double Ym, const double Pr, const double w);
+  enum Material {
+    LINEAR,
+    STVK,
+    COROTATIONAL,
+    NEOHOOKEAN
+  };
+  elastic_potential(const mati_t &tets, const matd_t &nods, Material type, const double Ym, const double Pr, const double w);
   size_t Nx() const;
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
@@ -60,6 +66,7 @@ public:
 private:
   const size_t dim_;
   double w_;
+  Material type_;
   const mati_t &tets_;
   matd_t vol_;
   double lam_, miu_;

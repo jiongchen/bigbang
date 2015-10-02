@@ -18,7 +18,6 @@ int calc_mass_matrix(const mati_t &cell,
                      spmat_t *M,
                      bool lumped) {
   const size_t SIMPLEX = cell.size(1);
-
   vector<Triplet<double>> trips;
   for (size_t i = 0; i < cell.size(2); ++i) {
     double coeff = 0;

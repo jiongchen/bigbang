@@ -92,8 +92,13 @@ int test_mass_matrix(ptree &pt) {
 }
 
 int test_energy(ptree &pt) {
-  shared_ptr<momentum_potential_imp_euler> sol;
-  sol->Nx();
+  mati_t tets;
+  matd_t nods;
+  jtf::mesh::tet_mesh_read_from_zjumat("../../dat/beam.tet", &nods, &tets);
+  ofstream os("./unitest/beam.vtk");
+  tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
+
+  cout << "done\n";
   return 0;
 }
 
@@ -105,6 +110,7 @@ int main(int argc, char *argv[])
     zjucad::read_cmdline(argc, argv, pt);
     CALL_SUB_PROG(test_kronecker_product);
     CALL_SUB_PROG(test_mass_matrix);
+    CALL_SUB_PROG(test_energy);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);
