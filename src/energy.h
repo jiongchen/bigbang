@@ -93,6 +93,8 @@ class bending_potential;
 
 class quadratic_bending_potential;
 
+class position_constraint;
+
 }
 
 #endif
