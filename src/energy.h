@@ -40,7 +40,7 @@ public:
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
   void Init(const double *x0, const double *v0);
   void Update(const double *x);
-  double QueryKineticEnergy();
+  double QueryKineticEnergy() const;
 private:
   const double rho_, h_;
   const size_t dim_;
@@ -85,6 +85,21 @@ private:
   const size_t dim_;
   double w_;
   Eigen::SparseMatrix<double> M_;
+};
+
+class positional_potential : public Functional<double>
+{
+public:
+  positional_potential(const std::vector<size_t> &fixed, const matd_t &p, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const size_t dim_;
+  double w_;
+  const matd_t p_;
+  const std::vector<size_t> &fixed_;
 };
 
 class spring_potential;

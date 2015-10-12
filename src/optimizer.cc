@@ -20,16 +20,19 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
   }
   SimplicialCholesky<SparseMatrix<double>> sol;
   Map<VectorXd> X(x, dim);
+  VectorXd Xstar, Xprev;
+  Xstar = Xprev = X;
   for (size_t iter = 0; iter < MAX_ITER; ++iter) {
     double value = 0;
-    f->Val(&X[0], &value); {
+    f->Val(&Xstar[0], &value); {
       if ( iter % 100 == 0 ) {
-        cout << "\t@energy value: " << value << endl;
+        cout << "\t@iter " << iter << endl;
+        cout << "\t@energy value: " << value << endl << endl;
       }
     }
     VectorXd grad(dim); {
       grad.setZero();
-      f->Gra(&X[0], &grad[0]);
+      f->Gra(&Xstar[0], &grad[0]);
       if ( grad.norm() <= EPS ) {
         cout << "\t@gradient converged\n";
         break;
@@ -37,7 +40,7 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
     }
     SparseMatrix<double> H(dim, dim); {
       vector<Triplet<double>> trips;
-      f->Hes(&X[0], &trips);
+      f->Hes(&Xstar[0], &trips);
       H.reserve(trips.size());
       H.setFromTriplets(trips.begin(), trips.end());
     }
@@ -45,8 +48,14 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
     ASSERT(sol.info() == Success);
     VectorXd dx = sol.solve(-grad);
     ASSERT(sol.info() == Success);
-    X += dx;
+    if ( dx.norm() <= EPS*Xprev.norm() ) {
+      cout << "[info] converged\n\n";
+      break;
+    }
+    Xprev = Xstar;
+    Xstar += dx;
   }
+  X = Xstar;
   return 0;
 }
 

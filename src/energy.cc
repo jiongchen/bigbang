@@ -181,7 +181,8 @@ elastic_potential::elastic_potential(const mati_t &tets, const matd_t &nods, Mat
 #pragma omp parallel for
   for (size_t i = 0; i < tets_.size(2); ++i) {
     matd_t edge = nods(colon(), tets_(colon(1, 3), i))-nods(colon(), tets_(0, i))*ones<double>(1, 3);
-    //vol_[i] = fabs(det())/6.0;
+    matd_t cp_edge = edge;
+    vol_[i] = fabs(det(cp_edge))/6.0;
     if ( inv(edge) )
       cerr << "\tdegenerated tet " << i << endl;
     std::copy(edge.begin(), edge.end(), &Dm_(0, i));
@@ -280,5 +281,41 @@ int elastic_potential::Hes(const double *x, vector<Triplet<double>> *hes) const 
   return 0;
 }
 //==============================================================================
+positional_potential::positional_potential(const std::vector<size_t> &fixed, const matd_t &p, const double w)
+  : dim_(p.size()), w_(w), fixed_(fixed), p_(p) {}
 
+size_t positional_potential::Nx() const {
+  return dim_;
+}
+
+int positional_potential::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  Map<const MatrixXd> X(x, 3, dim_/3);
+  Map<const MatrixXd> P(&p_[0], 3, dim_/3);
+  for (auto &id : fixed_) {
+    *val += 0.5*w_*(X.col(id)-P.col(id)).squaredNorm();
+  }
+  return 0;
+}
+
+int positional_potential::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (auto &id : fixed_) {
+    G(colon(), id) += w_*(X(colon(), id)-p_(colon(), id));
+  }
+  return 0;
+}
+
+int positional_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  for (auto &id : fixed_) {
+    hes->push_back(Triplet<double>(3*id+0, 3*id+0, w_));
+    hes->push_back(Triplet<double>(3*id+1, 3*id+1, w_));
+    hes->push_back(Triplet<double>(3*id+2, 3*id+2, w_));
+  }
+  return 0;
+}
+//==============================================================================
 }
