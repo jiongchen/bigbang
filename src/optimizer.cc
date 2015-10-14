@@ -1,6 +1,7 @@
 #include "optimizer.h"
 
 #include <iostream>
+#include <Eigen/UmfPackSupport>
 
 #include "config.h"
 #include "def.h"
@@ -27,7 +28,7 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
     f->Val(&Xstar[0], &value); {
       if ( iter % 100 == 0 ) {
         cout << "\t@iter " << iter << endl;
-        cout << "\t@energy value: " << value << endl << endl;
+        cout << "\t@energy value: " << value << endl;
       }
     }
     VectorXd grad(dim); {
@@ -49,13 +50,44 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
     VectorXd dx = sol.solve(-grad);
     ASSERT(sol.info() == Success);
     if ( dx.norm() <= EPS*Xprev.norm() ) {
-      cout << "[info] converged\n\n";
+      cout << "[info] converged after " << iter << " iterations\n\n";
       break;
     }
     Xprev = Xstar;
     Xstar += dx;
   }
   X = Xstar;
+  return 0;
+}
+
+int constrained_newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f, shared_ptr<Constraint<double>> &c) {
+  if ( dim != f->Nx() || dim != c->Nx() ) {
+    cerr << "[error] dim not match\n";
+    return __LINE__;
+  }
+  const size_t fdim = c->Nf();
+  UmfPackLU<SparseMatrix<double>> sol;
+  VectorXd X = VectorXd::Zero(dim+fdim);
+  std::copy(x, x+dim, X.data());
+  VectorXd xprev = X.head(dim);
+  for (size_t iter = 0; iter < MAX_ITER; ++iter) {
+    VectorXd rhs(dim+fdim); {
+      rhs.setZero();
+      f->Gra(&X[0], &rhs[0]);
+      c->Val(&X[0], &rhs[dim]);
+    }
+    SparseMatrix<double> LHS(dim+fdim, dim+fdim); {
+      vector<Triplet<double>> trips;
+      f->Hes(&X[0], &trips);
+      const auto begin = trips.end();
+      c->Jac(&X[0], dim, &trips);
+      const auto end = trips.end();
+      for (auto it = begin; it != end; ++it) {
+
+      }
+    }
+  }
+  std::copy(X.data(), X.data()+dim, x);
   return 0;
 }
 

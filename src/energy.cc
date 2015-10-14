@@ -85,66 +85,67 @@ double momentum_potential_imp_euler::QueryKineticEnergy() const {
   return 0.5*vn_.dot(M_*vn_);
 }
 //==============================================================================
-//momentum_potential_bdf2::momentum_potential_bdf2(const mati_t &cell, const matd_t &nods,
-//                                                 const double rho, const double h, const double w)
-//  : rho_(rho), h_(h), w_(w), dim_(nods.size()) {
-//  calc_mass_matrix(cell, nods, rho, cell.size(1), &M_, false);
-//  xn_ = Map<const VectorXd>(&nods[0], dim_);
-//  xnn_ = xn_;
-//  vn_.setZero(dim_);
-//  vnn_.setZero(dim_);
-//}
+momentum_potential_bdf2::momentum_potential_bdf2(const mati_t &cell, const matd_t &nods,
+                                                 const double rho, const double h, const double w)
+  : rho_(rho), h_(h), w_(w), dim_(nods.size()) {
+  calc_mass_matrix(cell, nods, rho, nods.size(1), &M_, false);
+  xn_ = Map<const VectorXd>(&nods[0], dim_);
+  xnn_ = xn_;
+  vn_.setZero(dim_);
+  vnn_.setZero(dim_);
+}
 
-//size_t momentum_potential_bdf2::Nx() const {
-//  return dim_;
-//}
+size_t momentum_potential_bdf2::Nx() const {
+  return dim_;
+}
 
-//int momentum_potential_bdf2::Val(const double *x, double *val) const {
-//  RETURN_WITH_COND_TRUE(w_ == 0.0);
-//  Map<const VectorXd> X(x, dim_);
-//  VectorXd dv = 1.5/h_*X-2.0/h_*xn_+0.5/h_*xnn_-4.0/3*vn_+1.0/3*vnn_;
-//  *val += 0.5*w_*dv.dot(M_*dv);
-//  return 0;
-//}
+int momentum_potential_bdf2::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  Map<const VectorXd> X(x, dim_);
+  VectorXd dv = 1.5/h_*X-2.0/h_*xn_+0.5/h_*xnn_-4.0/3*vn_+1.0/3*vnn_;
+  *val += 0.5*w_*dv.dot(M_*dv);
+  return 0;
+}
 
-//int momentum_potential_bdf2::Gra(const double *x, double *gra) const {
-//  RETURN_WITH_COND_TRUE(w_ == 0.0);
-//  Map<const VectorXd> X(x, dim_);
-//  Map<VectorXd> g(gra, dim_);
-//  g += w_*1.5/h_*M_*(1.5/h_*X-2.0/h_*xn_+0.5/h_*xnn_-4.0/3*vn_+1.0/3*vnn_);
-//  return 0;
-//}
+int momentum_potential_bdf2::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  Map<const VectorXd> X(x, dim_);
+  Map<VectorXd> g(gra, dim_);
+  g += w_*1.5/h_*M_*(1.5/h_*X-2.0/h_*xn_+0.5/h_*xnn_-4.0/3*vn_+1.0/3*vnn_);
+  return 0;
+}
 
-//int momentum_potential_bdf2::Hes(const double *x, vector<Triplet<double> > *hes) const {
-//  RETURN_WITH_COND_TRUE(w_ == 0.0);
-//  const double coeff = w_*2.25/(h_*h_);
-//  for (size_t j = 0; j < M_.outerSize(); ++j) {
-//    for (SparseMatrix<double>::InnerIterator it(M_, j); it; ++it)
-//      hes->push_back(Triplet<double>(it.row(), it.col(), coeff*it.value()));
-//  }
-//  return 0;
-//}
+int momentum_potential_bdf2::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  const double coeff = w_*2.25/(h_*h_);
+  for (size_t j = 0; j < M_.outerSize(); ++j) {
+    for (SparseMatrix<double>::InnerIterator it(M_, j); it; ++it) {
+      hes->push_back(Triplet<double>(it.row(), it.col(), coeff*it.value()));
+    }
+  }
+  return 0;
+}
 
-//void momentum_potential_bdf2::Init(const double *x0, const double *v0) {
-//  if ( x0 != nullptr ) {
+void momentum_potential_bdf2::Init(const double *x0, const double *v0) {
+  if ( x0 != nullptr ) {
 
-//  }
-//  if ( v0 != nullptr ) {
+  }
+  if ( v0 != nullptr ) {
 
-//  }
-//}
+  }
+}
 
-//void momentum_potential_bdf2::Update(const double *x) {
-//  Map<const VectorXd> X(x, dim_);
-//  vnn_ = vn_;
-//  vn_ = (3*X-4*xn_+xnn_)/(2*h_);
-//  xnn_ = xn_;
-//  xn_ = X;
-//}
+void momentum_potential_bdf2::Update(const double *x) {
+  Map<const VectorXd> X(x, dim_);
+  vnn_ = vn_;
+  vn_ = (3*X-4*xn_+xnn_)/(2*h_);
+  xnn_ = xn_;
+  xn_ = X;
+}
 
-//double momentum_potential_bdf2::QueryKineticEnergy() {
-//  return 0.5*vn_.dot(M_*vn_);
-//}
+double momentum_potential_bdf2::QueryKineticEnergy() const {
+  return 0.5*vn_.dot(M_*vn_);
+}
 //==============================================================================
 gravitational_potential::gravitational_potential(const mati_t &cell, const matd_t &nods,
                                                  const double rho, const double w)

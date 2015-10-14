@@ -14,7 +14,7 @@ using mati_t=zjucad::matrix::matrix<size_t>;
 using matd_t=zjucad::matrix::matrix<double>;
 
 const double RHO = 1;
-const double H = 0.01;
+const double H = 0.1;
 const double YOUNG = 1e4;
 const double POISSON = 0.45;
 
@@ -34,10 +34,12 @@ int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
   return 0;
 }
 
+#define IMPL_EULER
+
 int main(int argc, char *argv[])
 {
-  if ( argc != 3 ) {
-    cerr << "# Usage: " << "./prog model.tet fix_verts.fv\n";
+  if ( argc != 4 ) {
+    cerr << "# Usage: " << "./prog model.tet fix_verts.fv output_prefix\n";
     return __LINE__;
   }
   boost::filesystem::create_directory("./simple");
@@ -54,9 +56,13 @@ int main(int argc, char *argv[])
   // assemble energies
   vector<shared_ptr<Functional<double>>> ebf(4);
   shared_ptr<Functional<double>> energy;
+#ifdef IMPL_EULER
   ebf[0] = make_shared<momentum_potential_imp_euler>(tets, nods, RHO, H, 1e0);
+#else
+  ebf[0] = make_shared<momentum_potential_bdf2>(tets, nods, RHO, H, 1e0);
+#endif
   ebf[1] = make_shared<elastic_potential>(tets, nods, elastic_potential::STVK, YOUNG, POISSON, 1e0);
-  ebf[2] = make_shared<gravitational_potential>(tets, nods, RHO, 1e0);
+  ebf[2] = make_shared<gravitational_potential>(tets, nods, RHO, 2.0);
   ebf[3] = make_shared<positional_potential>(fixed, nods, 1e3);
   try {
     energy = make_shared<energy_t<double>>(ebf);
@@ -71,12 +77,14 @@ int main(int argc, char *argv[])
   char outfile[256];
   for (size_t i = 0; i < 200; ++i) {
     cout << "[info] frame " << i << endl;
-    sprintf(outfile, "./simple/frame_%zu.vtk", i);
+    sprintf(outfile, "./simple/%s_%zu.vtk", argv[3], i);
     ofstream os(outfile);
     tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
 
     newton_solve(&nods[0], nods.size(), energy);
-    dynamic_pointer_cast<momentum_potential_imp_euler>(ebf[0])->Update(&nods[0]);
+    dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }
+
+  cout << "[info] all done\n";
   return 0;
 }

@@ -11,7 +11,19 @@ using matd_t=zjucad::matrix::matrix<double>;
 
 namespace bigbang {
 
-class momentum_potential_imp_euler : public Functional<double>
+class momentum_potential : public Functional<double>
+{
+public:
+  ~momentum_potential() {}
+  virtual size_t Nx() const = 0;
+  virtual int Val(const double *x, double *val) const = 0;
+  virtual int Gra(const double *x, double *gra) const = 0;
+  virtual int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const = 0;
+  virtual void Update(const double *x) = 0;
+  virtual double QueryKineticEnergy() const = 0;
+};
+
+class momentum_potential_imp_euler : public momentum_potential
 {
 public:
   momentum_potential_imp_euler(const mati_t &cell, const matd_t &nods, const double rho, const double h, const double w=1.0);
@@ -30,7 +42,7 @@ private:
   Eigen::VectorXd xn_, vn_;
 };
 
-class momentum_potential_bdf2 : public Functional<double>
+class momentum_potential_bdf2 : public momentum_potential
 {
 public:
   momentum_potential_bdf2(const mati_t &cell, const matd_t &nods, const double rho, const double h, const double w=1.0);
