@@ -45,4 +45,25 @@ block(
   return()
 )$
 
+block(
+  [X, h, lam, miu],
+  X: genmatrix(X, 3, 8),
+  h: genmatrix(h, 1, 1),
+  lam: genmatrix(lam, 1, 1),
+  miu: genmatrix(miu, 1, 1),
+  
+  hex_stvk(X, h, lam, miu) := block(
+    [G, F, E],
+    G: 1.0/(4*h[1,1])*matrix([-1, 1, -1, 1, -1, 1, -1, 1],
+			     [-1, -1, 1, 1, -1, -1, 1, 1],
+			     [-1, -1, -1, -1, 1, 1, 1, 1]),
+    F: X.transpose(G), /*transpose(G . transpose(X)),*/
+    E: 0.5*(transpose(F).F-ident(3)),
+    h*h*h*(miu*mat_norm(E, frobenius)^2+0.5*lam*mat_trace(E)^2)
+  ),
+  with_stdout(f, val_jac_hes_to_f90(hex_stvk, [X, h, lam, miu])),
+  
+  return()
+)$
+
 close(f)$

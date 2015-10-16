@@ -4,6 +4,7 @@
 #include <hjlib/math/blas_lapack.h>
 #include <zjucad/matrix/lapack.h>
 #include <zjucad/matrix/itr_matrix.h>
+#include <unsupported/Eigen/KroneckerProduct>
 
 #include "mass_matrix.h"
 #include "config.h"
@@ -28,7 +29,27 @@ void tet_neohookean_(double *val, const double *x, const double *Dm, const doubl
 void tet_neohookean_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
 void tet_neohookean_hes_(double *hes, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
 
+void hex_stvk_(double *val, const double *x, const double *h, const double *lam, const double *miu);
+void hex_stvk_jac_(double *jac, const double *x, const double *h, const double *lam, const double *miu);
+void hex_stvk_hes_(double *hes, const double *x, const double *h, const double *lam, const double *miu);
+
 }
+
+void tet_corotational_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
+  Map<VectorXd> grad(jac, 3, 4);
+  Map<const MatrixXd> X(x, 3, 4);
+  Map<const Matrix3d> DM(Dm);
+}
+
+void tet_corotational_hes_(double *hes, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
+  Map<MatrixXd> H(hes, 12, 12);
+  Map<const MatrixXd> X(x, 3, 4);
+  Map<const Matrix3d> DM(Dm);
+  Matrix3d defoGrad = (X.block<3, 3>(1, 3)-X.col(0)*Vector3d::Ones().transpose())*DM;
+  Matrix3d R;
+  MatrixXd Rll = kroneckerProduct(Matrix3d::Identity(), R);
+}
+
 //==============================================================================
 momentum_potential_imp_euler::momentum_potential_imp_euler(const mati_t &cell, const matd_t &nods,
                                                            const double rho, const double h, const double w)

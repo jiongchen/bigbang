@@ -8,6 +8,8 @@
 #include <unordered_set>
 #include <hjlib/math/blas_lapack.h>
 #include <zjucad/matrix/lapack.h>
+#include <zjucad/matrix/itr_matrix.h>
+#include <zjucad/matrix/io.h>
 
 #include "src/mass_matrix.h"
 #include "src/config.h"
@@ -102,6 +104,39 @@ int test_energy(ptree &pt) {
   return 0;
 }
 
+extern "C" {
+  void hex_stvk_(double *val, const double *x, const double *h, const double *lam, const double *miu);
+}
+
+int test_hex_elastic(ptree &pt) {
+  double h = 1.0;
+  double a = 1.0;
+  double b = 1.0;
+  double value = 0.0;
+
+  const double G[24] = {-1,-1,-1, 1,-1,-1, -1,1,-1, 1,1,-1, -1,-1,1, 1,-1,1, -1,1,1, 1,1,1};
+  Map<const Matrix<double, 3, 8>> Ge(G);
+  cout << "Ge:\n" << Ge << endl << endl;
+  Matrix<double, 3, 8> Gee = 1.0/(4*h)*Ge;
+
+  const double x[24] = {0,0,0, 1,0,0, 0,1,0, 1,1,0, 0,0,1, 1,0,1, 0,1,1, 1,1,1};
+  Map<const Matrix<double, 3, 8>> X(x);
+  cout << "X:\n" << X << endl << endl;
+
+  Matrix3d F = X*Gee.transpose();
+  cout << F << endl << endl;
+
+  Matrix3d E = 0.5*(F.transpose()*F-Matrix3d::Identity());
+  double energy = h*h*h*(a*E.squaredNorm()+0.5*b*E.trace()*E.trace());
+  cout << "energy value: " << energy << endl;
+
+  hex_stvk_(&value, x, &h, &a, &b);
+  cout << "energy value: " << value << endl;
+
+  cout << "\ndone\n";
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -111,6 +146,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_kronecker_product);
     CALL_SUB_PROG(test_mass_matrix);
     CALL_SUB_PROG(test_energy);
+    CALL_SUB_PROG(test_hex_elastic);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);
