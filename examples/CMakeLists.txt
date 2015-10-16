@@ -23,3 +23,5 @@ target_link_libraries(test_simple
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(binvox_parser binvox_parser.cc)

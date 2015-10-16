@@ -29,6 +29,10 @@ void tet_neohookean_(double *val, const double *x, const double *Dm, const doubl
 void tet_neohookean_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
 void tet_neohookean_hes_(double *hes, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
 
+void hex_linear_(double *val, const double *x, const double *h, const double *lam, const double *miu);
+void hex_linear_jac_(double *jac, const double *x, const double *h, const double *lam, const double *miu);
+void hex_linear_hes_(double *hes, const double *x, const double *h, const double *lam, const double *miu);
+
 void hex_stvk_(double *val, const double *x, const double *h, const double *lam, const double *miu);
 void hex_stvk_jac_(double *jac, const double *x, const double *h, const double *lam, const double *miu);
 void hex_stvk_hes_(double *hes, const double *x, const double *h, const double *lam, const double *miu);
