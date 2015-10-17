@@ -5,6 +5,8 @@
 
 #include "config.h"
 #include "def.h"
+#include "HLBFGS/HLBFGS.h"
+#include "HLBFGS/Lite_Sparse_Matrix.h"
 
 using namespace std;
 using namespace Eigen;
@@ -57,6 +59,37 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
     Xstar += dx;
   }
   X = Xstar;
+  return 0;
+}
+
+typedef void (*lbfgs_func_t)(int N, double* x, double *prev_x, double* f, double* g);
+
+void newiteration(int iter, int call_iter, double *x, double* f, double *g,  double* gnorm) {
+  cout << iter <<": " << call_iter <<" " << *f <<" " << *gnorm  << endl;
+}
+
+int lbfgs_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f, const int M, const int T, bool with_hessian) {
+  if ( dim != f->Nx() ) {
+    cerr << "[error] dim not match\n";
+    return __LINE__;
+  }
+
+  double parameter[20];
+  int info[20];
+  //initialize
+  INIT_HLBFGS(parameter, info);
+  info[4] = MAX_ITER;
+  info[6] = T;
+  info[7] = with_hessian?1:0;
+  info[10] = 0;
+  info[11] = 1;
+
+  lbfgs_func_t evalfunc;
+  if ( with_hessian ) {
+//    HLBFGS();
+  } else {
+    HLBFGS(dim, M, x, evalfunc, 0, HLBFGS_UPDATE_Hessian, newiteration, parameter, info);
+  }
   return 0;
 }
 

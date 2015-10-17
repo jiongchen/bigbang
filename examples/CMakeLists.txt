@@ -25,3 +25,8 @@ target_link_libraries(test_simple
 )
 
 add_executable(binvox_parser binvox_parser.cc)
+
+add_executable(lbfgs_demo lbfgs_demo.cc)
+target_link_libraries(lbfgs_demo
+    HLBFGS
+)

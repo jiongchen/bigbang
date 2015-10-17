@@ -20,8 +20,11 @@ add_custom_command(OUTPUT elasticity.f90
     DEPENDS elasticity.mac
 )
 
+add_subdirectory(HLBFGS)
+
 add_library(bigbang SHARED ${header} ${source} potential.f90 pbd_cons.f90 elasticity.f90)
 target_link_libraries(bigbang
     jtf-mesh
     ${UMFPACK_LIBRARIES}
+    HLBFGS
 )
