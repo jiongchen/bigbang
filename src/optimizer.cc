@@ -65,10 +65,8 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
 
 static shared_ptr<Functional<double>> energy;
 
-static lbfgsfloatval_t evaluate(void *instance,
-                                const lbfgsfloatval_t *x,
-                                lbfgsfloatval_t *g,
-                                const int n,
+static lbfgsfloatval_t evaluate(void *instance, const lbfgsfloatval_t *x,
+                                lbfgsfloatval_t *g, const int n,
                                 const lbfgsfloatval_t step) {
   double f = 0;
   energy->Val(x, &f);
@@ -97,8 +95,8 @@ int lbfgs_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f) 
     cerr << "[error] dim not match\n";
     return __LINE__;
   }
-  energy = f;
 
+  energy = f;
   lbfgsfloatval_t fx;
   lbfgs_parameter_t param;
   lbfgs_parameter_init(&param);
