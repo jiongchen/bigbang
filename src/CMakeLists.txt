@@ -27,4 +27,5 @@ target_link_libraries(bigbang
     jtf-mesh
     ${UMFPACK_LIBRARIES}
     HLBFGS
+    ${LBFGS_LIBRARIES}
 )

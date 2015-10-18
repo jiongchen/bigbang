@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <Eigen/UmfPackSupport>
+#include <lbfgs.h>
 
 #include "config.h"
 #include "def.h"
@@ -62,34 +63,49 @@ int newton_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f)
   return 0;
 }
 
-typedef void (*lbfgs_func_t)(int N, double* x, double *prev_x, double* f, double* g);
+static shared_ptr<Functional<double>> energy;
 
-void newiteration(int iter, int call_iter, double *x, double* f, double *g,  double* gnorm) {
-  cout << iter <<": " << call_iter <<" " << *f <<" " << *gnorm  << endl;
+static lbfgsfloatval_t evaluate(void *instance,
+                                const lbfgsfloatval_t *x,
+                                lbfgsfloatval_t *g,
+                                const int n,
+                                const lbfgsfloatval_t step) {
+  double f = 0;
+  energy->Val(x, &f);
+  std::fill(g, g+n, 0);
+  energy->Gra(x, g);
+  return f;
 }
 
-int lbfgs_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f, const int M, const int T, bool with_hessian) {
+static int progress(void *instance,
+                    const lbfgsfloatval_t *x,
+                    const lbfgsfloatval_t *g,
+                    const lbfgsfloatval_t fx,
+                    const lbfgsfloatval_t xnorm,
+                    const lbfgsfloatval_t gnorm,
+                    const lbfgsfloatval_t step,
+                    int n, int k, int ls) {
+//  printf("Iteration %d:\n", k);
+//  printf("  fx = %f, x[0] = %f, x[1] = %f\n", fx, x[0], x[1]);
+//  printf("  xnorm = %f, gnorm = %f, step = %f\n", xnorm, gnorm, step);
+//  printf("\n");
+  return 0;
+}
+
+int lbfgs_solve(double *x, const size_t dim, shared_ptr<Functional<double>> &f) {
   if ( dim != f->Nx() ) {
     cerr << "[error] dim not match\n";
     return __LINE__;
   }
+  energy = f;
 
-  double parameter[20];
-  int info[20];
-  //initialize
-  INIT_HLBFGS(parameter, info);
-  info[4] = MAX_ITER;
-  info[6] = T;
-  info[7] = with_hessian?1:0;
-  info[10] = 0;
-  info[11] = 1;
+  lbfgsfloatval_t fx;
+  lbfgs_parameter_t param;
+  lbfgs_parameter_init(&param);
 
-  lbfgs_func_t evalfunc;
-  if ( with_hessian ) {
-//    HLBFGS();
-  } else {
-    HLBFGS(dim, M, x, evalfunc, 0, HLBFGS_UPDATE_Hessian, newiteration, parameter, info);
-  }
+  int ret = lbfgs(dim, x, &fx, evaluate, progress, NULL, &param);
+
+  printf("L-BFGS optimization terminated with status code = %d\n", ret);
   return 0;
 }
 

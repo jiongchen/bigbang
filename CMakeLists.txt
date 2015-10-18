@@ -33,6 +33,11 @@ if(SuiteSparse_FOUND)
     include_directories(${SuiteSparse_INCLUDE_DIRS})
 endif(SuiteSparse_FOUND)
 
+# LBFGS
+find_package(LBFGS REQUIRED)
+if(LBFGS_FOUND)
+    include_directories(${LBFGS_INCLUDE_DIRS})
+endif(LBFGS_FOUND)
 
 add_subdirectory(src)
 add_subdirectory(examples)

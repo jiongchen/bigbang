@@ -30,3 +30,9 @@ add_executable(lbfgs_demo lbfgs_demo.cc)
 target_link_libraries(lbfgs_demo
     HLBFGS
 )
+
+add_executable(lbfgs_demo_other lbfgs_demo_other.cc)
+target_link_libraries(lbfgs_demo_other
+    ${LBFGS_LIBRARIES}
+)
+
