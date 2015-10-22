@@ -123,10 +123,6 @@ int read_binvox(string filespec)
 
 }
 
-int from_point_to_hex(const mati_t &pts, mati_t &hex, matd_t &nods) {
-
-}
-
 int binvox_to_hex_vtk(const char *file) {
   ifstream ifs(file);
   if ( ifs.fail() ) {
@@ -152,6 +148,9 @@ int binvox_to_hex_vtk(const char *file) {
     has.push_back(flag);
   }
 
+  const double halfd = 1.0/dim;
+  //const double dir[24] = {---, +--, -+-, ++-, --+, +-+, -++, +++};
+  // extract eight vertices of a cube
   vector<double> coord;
   for (size_t x = 0; x < dim; ++x) {
     for (size_t y = 0; y < dim; ++y) {

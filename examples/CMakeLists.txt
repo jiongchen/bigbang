@@ -36,3 +36,8 @@ target_link_libraries(lbfgs_demo_other
     ${LBFGS_LIBRARIES}
 )
 
+add_executable(test_mass_spring mass_spring.cc)
+target_link_libraries(test_mass_spring
+    bigbang
+    ${Boost_LIBRARIES}
+)

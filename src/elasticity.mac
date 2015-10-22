@@ -1,10 +1,49 @@
-load(vect)$
-load(eigen)$
 load(hj_fortran2)$
+load(cj_function)$
 
 optimprefix : tt$
 
 f: openw("elasticity.f90")$
+
+block(
+  [X, d],
+  X: genmatrix(X, 3, 2),
+  d: genmatrix(d, 1, 1),
+
+  calc_edge_length(X) := block(
+    matrix([NORM(col(X, 1)-col(X, 2))])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(calc_edge_length, [X])),
+
+  mass_spring(X, d) := block(
+    [curr_len, rtn],
+    curr_len: NORM(col(X, 1)-col(X, 2)),
+    rtn: (curr_len/d[1,1]-1)^2*d[1,1],
+    matrix([rtn])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(mass_spring, [X, d])),
+
+  return()
+)$
+
+block(
+  [X, d1, d2],
+  X: genmatrix(X, 3, 4),
+  d1: genmatrix(d1, 1, 1),
+  d2: genmatrix(d2, 1, 1),
+  
+  line_bending(X, d1, d2) := block(
+    [e1, e2, Kb, rtn],
+    e1: col(X, 1)-col(X, 2),
+    e2: col(X, 3)-col(X, 4),
+    Kb: 2*CROSS(e1, e2)/(d1[1,1]*d2[1,1]+DOT(e1, e2)),
+    rtn: DOT(Kb, Kb)/(d1[1,1]+d2[1,1]),
+    matrix([rtn])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(line_bending, [X, d1, d2])),
+  
+  return()
+)$
 
 block(
   [X, D, volume, lam, miu],

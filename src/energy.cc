@@ -37,6 +37,18 @@ void hex_stvk_(double *val, const double *x, const double *h, const double *lam,
 void hex_stvk_jac_(double *jac, const double *x, const double *h, const double *lam, const double *miu);
 void hex_stvk_hes_(double *hes, const double *x, const double *h, const double *lam, const double *miu);
 
+void calc_edge_length_(double *val, const double *x);
+void calc_edge_length_jac_(double *jac, const double *x);
+void calc_edge_length_hes_(double *hes, const double *x);
+
+void mass_spring_(double *val, const double *x, const double *d);
+void mass_spring_jac_(double *jac, const double *x, const double *d);
+void mass_spring_hes_(double *hes, const double *x, const double *d);
+
+void line_bending_(double *val, const double *x, const double *d1, const double *d2);
+void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
+void line_bending_hes_(double *hes, const double *x, const double *d1, const double *d2);
+
 }
 
 void tet_corotational_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
@@ -300,7 +312,8 @@ int elastic_potential::Hes(const double *x, vector<Triplet<double>> *hes) const 
       for (size_t q = 0; q < 12; ++q) {
         const size_t I = 3*tets_(p/3, i)+p%3;
         const size_t J = 3*tets_(q/3, i)+q%3;
-        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+        if ( H(p, q) != 0.0 )
+          hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
       }
     }
   }
@@ -340,6 +353,129 @@ int positional_potential::Hes(const double *x, vector<Triplet<double>> *hes) con
     hes->push_back(Triplet<double>(3*id+0, 3*id+0, w_));
     hes->push_back(Triplet<double>(3*id+1, 3*id+1, w_));
     hes->push_back(Triplet<double>(3*id+2, 3*id+2, w_));
+  }
+  return 0;
+}
+//==============================================================================
+spring_potential::spring_potential(const mati_t &edge, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), edge_(edge) {
+  len_.resize(edge_.size(2), 1);
+#pragma omp parallel for
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t vert = nods(colon(), edge_(colon(), i));
+    calc_edge_length_(&len_[i], &vert[0]);
+  }
+}
+
+size_t spring_potential::Nx() const {
+  return dim_;
+}
+
+int spring_potential::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t vert = X(colon(), edge_(colon(), i));
+    double value = 0;
+    mass_spring_(&value, &vert[0], &len_[i]);
+    *val += value;
+  }
+  return 0;
+}
+
+int spring_potential::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t vert = X(colon(), edge_(colon(), i));
+    matd_t g = zeros<double>(3, 2);
+    mass_spring_jac_(&g[0], &vert[0], &len_[i]);
+    G(colon(), edge_(colon(), i)) += w_*g;
+  }
+  return 0;
+}
+
+int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t vert = X(colon(), edge_(colon(), i));
+    matd_t H = zeros<double>(6, 6);
+    mass_spring_hes_(&H[0], &vert[0], &len_[i]);
+    for (size_t p = 0; p < 6; ++p) {
+      for (size_t q = 0; q < 6; ++q) {
+        const size_t I = 3*edge_(p/3, i)+p%3;
+        const size_t J = 3*edge_(q/3, i)+q%3;
+        if ( H(p, q) != 0.0 )
+          hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
+}
+//==============================================================================
+line_bending_potential::line_bending_potential(const mati_t &edge, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), edge_(edge) {
+  len_.resize(edge_.size(2), 1);
+#pragma omp parallel for
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t vert = nods(colon(), edge_(colon(), i));
+    calc_edge_length_(&len_[i], &vert[0]);
+  }
+}
+
+size_t line_bending_potential::Nx() const {
+  return dim_;
+}
+
+int line_bending_potential::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < edge_.size(2)-1; ++i) {
+    matd_t vert(3, 4);
+    vert(colon(), colon(0, 1)) = X(colon(), edge_(colon(), i));
+    vert(colon(), colon(2, 3)) = X(colon(), edge_(colon(), i+1));
+    double value = 0;
+    line_bending_(&value, &vert[0], &len_[i], &len_[i+1]);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int line_bending_potential::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < edge_.size(2)-1; ++i) {
+    matd_t vert(3, 4);
+    vert(colon(), colon(0, 1)) = X(colon(), edge_(colon(), i));
+    vert(colon(), colon(2, 3)) = X(colon(), edge_(colon(), i+1));
+    matd_t g(3, 4);
+    line_bending_jac_(&g[0], &vert[0], &len_[i], &len_[i+1]);
+    G(colon(), edge_(colon(), i)) += w_*g(colon(), colon(0, 1));
+    G(colon(), edge_(colon(), i+1)) += w_*g(colon(), colon(2, 3));
+  }
+  return 0;
+}
+
+int line_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < edge_.size(2)-1; ++i) {
+    matd_t vert(3, 4);
+    vert(colon(), colon(0, 1)) = X(colon(), edge_(colon(), i));
+    vert(colon(), colon(2, 3)) = X(colon(), edge_(colon(), i+1));
+    matd_t H(12, 12);
+    line_bending_hes_(&H[0], &vert[0], &len_[i], &len_[i+1]);
+    for (size_t p = 0; p < 12; ++p) {
+      for (size_t q = 0; q < 12; ++q) {
+        const size_t I = 3*edge_((p%6)/3, i+p/6)+p%3;
+        const size_t J = 3*edge_((q%6)/3, i+q/6)+q%3;
+        if ( H(p, q) != 0.0 )
+          hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
   }
   return 0;
 }

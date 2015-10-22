@@ -114,9 +114,37 @@ private:
   const std::vector<size_t> &fixed_;
 };
 
-class spring_potential;
+class spring_potential : public Functional<double>
+{
+public:
+  spring_potential(const mati_t &edge, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &edge_;
+  matd_t len_;
+};
 
-class bending_potential;
+class line_bending_potential : public Functional<double>
+{
+public:
+  line_bending_potential(const mati_t &edge, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &edge_;
+  matd_t len_;
+};
+
+class surf_bending_potential;
 
 class quadratic_bending_potential;
 
