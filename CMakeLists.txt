@@ -13,7 +13,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost COMPONENTS filesystem system REQUIRED)
+find_package(Boost COMPONENTS filesystem system program_options REQUIRED)
 
 # EIGEN3
 find_package(Eigen3 REQUIRED)
