@@ -137,6 +137,16 @@ int test_hex_elastic(ptree &pt) {
   return 0;
 }
 
+int test_mat_add_scalar(ptree &pt) {
+  matd_t mat = rand<double>(3, 2);
+  cout << mat << endl << endl;
+  mat += 3.0;
+  cout << mat << endl << endl;
+  mat(colon(), 0) += 1.0;
+  cout << mat << endl << endl;
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -147,6 +157,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_mass_matrix);
     CALL_SUB_PROG(test_energy);
     CALL_SUB_PROG(test_hex_elastic);
+    CALL_SUB_PROG(test_mat_add_scalar);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);

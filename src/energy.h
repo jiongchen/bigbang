@@ -85,6 +85,27 @@ private:
   matd_t Dm_;
 };
 
+class voxel_elastic_potential : public Functional<double>
+{
+public:
+  enum Material {
+    LINEAR,
+    STVK
+  };
+  voxel_elastic_potential(const mati_t &cube, const matd_t &nods, Material type,
+                          const double Ym, const double Pr, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const size_t dim_;
+  double w_;
+  Material type_;
+  const mati_t &cube_;
+  double h_, lam_, miu_;
+};
+
 class gravitational_potential : public Functional<double>
 {
 public:

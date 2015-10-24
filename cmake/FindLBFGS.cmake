@@ -10,10 +10,10 @@ pkg_check_modules (PC_LBFGS QUIET liblbfgs)
 set (LBFGS_DEFINITIONS ${PC_LBFGS_CFLAGS_OTHER})
 
 find_path(LBFGS_INCLUDE_DIR NAMES lbfgs.h
-    HINTS @CMAKE_INSTALL_PREFIX@/include ${PC_LBFGS_INCLUDEDIR} ${PC_LBFGS_INCLUDE_DIRS} /usr/include /usr/local/include /opt/local/include)
+    HINTS  ${PC_LBFGS_INCLUDEDIR} ${PC_LBFGS_INCLUDE_DIRS} /usr/include /usr/local/include /opt/local/include)
 
 find_library (LBFGS_LIBRARY NAMES liblbfgs lbfgs
-    HINTS @CMAKE_INSTALL_PREFIX@/lib ${PC_LBFGS_LIBDIR} ${PC_LBFGS_LIBRARY_DIRS} /usr/lib /usr/local/lib /opt/local/lib)
+    HINTS  ${PC_LBFGS_LIBDIR} ${PC_LBFGS_LIBRARY_DIRS} /usr/lib /usr/local/lib /opt/local/lib)
 
 set (LBFGS_LIBRARIES ${LBFGS_LIBRARY})
 set (LBFGS_INCLUDE_DIRS ${LBFGS_INCLUDE_DIR})

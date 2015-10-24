@@ -40,6 +40,12 @@ int calc_mass_matrix(const mati_t &cell,
         coeff = rho*volume/20.0;
         break;
       }
+      case 8: {
+        double h = norm(nods(colon(), cell(0, i))-nods(colon(), cell(1, i)));
+        double volume = h*h*h;
+        coeff = rho*volume/72.0;
+        break;
+      }
       default: {
         cerr << "[info] mesh type not supported\n";
         exit(EXIT_FAILURE);

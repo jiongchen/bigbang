@@ -24,7 +24,7 @@ target_link_libraries(test_simple
     ${Boost_LIBRARIES}
 )
 
-add_executable(binvox_parser binvox_parser.cc)
+add_executable(binvox2hex binvox2hex.cc)
 
 add_executable(lbfgs_demo lbfgs_demo.cc)
 target_link_libraries(lbfgs_demo
@@ -38,6 +38,12 @@ target_link_libraries(lbfgs_demo_other
 
 add_executable(test_mass_spring mass_spring.cc)
 target_link_libraries(test_mass_spring
+    bigbang
+    ${Boost_LIBRARIES}
+)
+
+add_executable(test_embedded_fem embedded_fem.cc)
+target_link_libraries(test_embedded_fem
     bigbang
     ${Boost_LIBRARIES}
 )

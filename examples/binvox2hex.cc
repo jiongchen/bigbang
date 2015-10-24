@@ -1,6 +1,6 @@
 //
 // This example program reads a .binvox file and writes
-// an ASCII version of the same file called "voxels.txt"
+// the extracted hexhedral mesh to vtk format
 //
 // 0 = empty voxel
 // 1 = filled voxel
@@ -16,14 +16,14 @@
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
+#include <algorithm>
 #include <zjucad/matrix/matrix.h>
 
+#include "src/config.h"
 #include "src/vtk.h"
 
 using namespace std;
 using namespace zjucad::matrix;
-using mati_t=zjucad::matrix::matrix<size_t>;
-using matd_t=zjucad::matrix::matrix<double>;
 
 typedef unsigned char byte;
 static int version;
@@ -33,9 +33,17 @@ static byte *voxels = 0;
 static float tx, ty, tz;
 static float scale;
 
+#define SQUARE(x) ((x)*(x))
+
+struct point {
+  double x, y, z;
+  bool operator ==(const point &other) const {
+    return SQUARE(x-other.x)+SQUARE(y-other.y)+SQUARE(z-other.z) < 1e-8;
+  }
+};
+
 int read_binvox(string filespec)
 {
-
   ifstream *input = new ifstream(filespec.c_str(), ios::in | ios::binary);
 
   //
@@ -123,66 +131,58 @@ int read_binvox(string filespec)
 
 }
 
-int binvox_to_hex_vtk(const char *file) {
-  ifstream ifs(file);
-  if ( ifs.fail() ) {
-    cerr << "[error] can not open " << file << endl;
-    return __LINE__;
-  }
+int binvox_to_hexmesh(matrix<size_t> &hexs, matrix<double> &nods) {
+  const size_t nbrhex = std::count(voxels, voxels+size, 1);
+  hexs.resize(8, nbrhex);
+  cout << "[info] hex number: " << nbrhex << endl;
 
-  const size_t MAX_LEN = 1024;
-  char buff[MAX_LEN];
-  size_t dim;
-  double t[3];
-  double s;
-  char flag;
-  vector<char> has;
-
-  ifs.getline(buff, MAX_LEN);
-  ifs >> buff >> dim >> dim >> dim;
-  ifs >> buff >> t[0] >> t[1] >> t[2];
-  ifs >> buff >> s;
-  ifs >> buff;
-  while ( !ifs.eof() ) {
-    ifs >> flag;
-    has.push_back(flag);
-  }
-
-  const double halfd = 1.0/dim;
-  //const double dir[24] = {---, +--, -+-, ++-, --+, +-+, -++, +++};
+  const size_t dim = depth;
+  const double hd = 0.5/dim;
+  const double dir[8][3] = {{-hd,-hd,-hd}, {+hd,-hd,-hd}, {-hd,+hd,-hd}, {+hd,+hd,-hd},
+                            {-hd,-hd,+hd}, {+hd,-hd,+hd}, {-hd,+hd,+hd}, {+hd,+hd,+hd}};
   // extract eight vertices of a cube
-  vector<double> coord;
+  vector<point> temp;
+  size_t hex_count = 0;
   for (size_t x = 0; x < dim; ++x) {
     for (size_t y = 0; y < dim; ++y) {
       for (size_t z = 0; z < dim; ++z) {
         const size_t idx = x*dim*dim+z*dim+y;
-        if ( has[idx] != '0' ) {
+        if ( voxels[idx] ) {
           double xyz[3] = {(x+0.5)/dim, (y+0.5)/dim, (z+0.5)/dim};
-          coord.push_back(xyz[0]);
-          coord.push_back(xyz[1]);
-          coord.push_back(xyz[2]);
+          for (size_t k = 0; k < 8; ++k) {
+            point curr = {xyz[0]+dir[k][0], xyz[1]+dir[k][1], xyz[2]+dir[k][2]};
+            auto it = std::find(temp.begin(), temp.end(), curr);
+            if ( it == temp.end() ) {
+              temp.push_back(curr);
+              hexs(k, hex_count) = temp.size()-1;
+            } else {
+              hexs(k, hex_count) = it-temp.begin();
+            }
+          }
+          ++hex_count;
         }
       }
     }
   }
-  const size_t pts_num = coord.size()/3;
-  matrix<size_t> pts = colon(0, pts_num-1);
-  ofstream os("./extracted_points.vtk");
-  point2vtk(os, &coord[0], pts_num, &pts[0], pts_num);
+  ASSERT(hex_count == nbrhex);
+  cout << "[info] vertices number: " << temp.size() << endl;
 
-  // extract hex
-  mati_t hexs(8, pts_num);
-  matd_t nods(3, 5);
-  for (size_t i = 0; i < pts_num; ++i) {
-
+  nods.resize(3, temp.size());
+#pragma omp parallel for
+  for (size_t i = 0; i < nods.size(2); ++i) {
+    nods(0, i) = temp[i].x;
+    nods(1, i) = temp[i].y;
+    nods(2, i) = temp[i].z;
   }
-//  nods *= s;
-//  nods += t;
+  // scale and translate the coordinates
+  nods *= scale;
+  nods(0, colon()) += tx;
+  nods(1, colon()) += ty;
+  nods(2, colon()) += tz;
 
   printf("\ndim: %zu\n", dim);
-  printf("translate: (%lf, %lf, %lf)\n", t[0], t[1], t[2]);
-  printf("scale: %lf\n", s);
-  printf("number of points: %zu\n", pts_num);
+  printf("translate: (%lf, %lf, %lf)\n", tx, ty, tz);
+  printf("scale: %lf\n", scale);
 
   return 0;
 }
@@ -190,43 +190,23 @@ int binvox_to_hex_vtk(const char *file) {
 
 int main(int argc, char **argv)
 {
-  if (argc != 2) {
-    cout << "Usage: read_binvox <binvox filename>" << endl << endl;
-    exit(1);
+  if ( argc != 3 ) {
+    cout << "Usage: binvox2hex <binvox filename> <hexmesh filename>\n\n";
+    return __LINE__;
   }
 
-  if (!read_binvox(argv[1])) {
+  if ( !read_binvox(argv[1]) ) {
     cout << "Error reading [" << argv[1] << "]" << endl << endl;
-    exit(1);
+    return __LINE__;
   }
 
-  //
-  // now write the data to as ASCII
-  //
-  ofstream *out = new ofstream("voxels.txt");
-  if(!out->good()) {
-    cout << "Error opening [voxels.txt]" << endl << endl;
-    exit(1);
-  }
+  matrix<size_t> hexs;
+  matrix<double> nods;
+  binvox_to_hexmesh(hexs, nods);
 
-  cout << "Writing voxel data to ASCII file..." << endl;
-
-  *out << "#binvox ASCII data" << endl;
-  *out << "dim " << depth << " " << height << " " << width << endl;
-  *out << "translate " << tx << " " << ty << " " << tz << endl;
-  *out << "scale " << scale << endl;
-  *out << "data" << endl;
-
-  for(int i=0; i < size; i++) {
-    *out << (char) (voxels[i] + '0') << " ";
-    if (((i + 1) % width) == 0) *out << endl;
-  }
-
-  out->close();
-
-  binvox_to_hex_vtk("voxels.txt");
+  ofstream os(argv[2]);
+  hex2vtk(os, &nods[0], nods.size(2), &hexs[0], hexs.size(2));
 
   cout << "\ndone" << endl << endl;
-
   return 0;
 }
