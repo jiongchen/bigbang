@@ -39,7 +39,7 @@ block(
     b1xb2: CROSS(b1, b2),
     b2xb3: CROSS(b2, b3),
     sintheta: DOT(CROSS(b1xb2, b2xb3), b2/NORM(b2)),
-    costheta: DOT(b1xb2, b2xb3),
+    costheta: -DOT(b1xb2, b2xb3),
     matrix([ atan2(sintheta, costheta) ])
   ),
   with_stdout(f, val_jac_hes_to_f90(calc_bend, [X]))

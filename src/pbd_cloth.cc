@@ -27,7 +27,7 @@ void calc_bend_jac_(double *jac, const double *x);
 
 }
 
-void get_edge_elements(const mati_t &tris, mati_t &ele) {
+static void get_edge_elements(const mati_t &tris, mati_t &ele) {
   unique_ptr<edge2cell_adjacent> ea(edge2cell_adjacent::create(tris, false));
   ele.resize(2, ea->edges_.size());
 #pragma omp parallel for
@@ -37,7 +37,7 @@ void get_edge_elements(const mati_t &tris, mati_t &ele) {
   }
 }
 
-void get_dihedral_elements(const mati_t &tris, mati_t &ele) {
+static void get_dihedral_elements(const mati_t &tris, mati_t &ele) {
   unique_ptr<edge2cell_adjacent> ea(edge2cell_adjacent::create(tris, false));
   mati_t bd_ed_id;
   get_boundary_edge_idx(*ea, bd_ed_id);
@@ -207,7 +207,7 @@ double pbd_cloth_solver::query_constraint_squared_norm(const double *x) const {
 int pbd_cloth_solver::precompute() {
   /// construct constraints with rest configuration
   add_strecth_constraints(tris_, nods_);
-//  add_bend_constraints(tris_, nods_);
+  add_bend_constraints(tris_, nods_);
   cout << "[info] constraint number: " << buff_.size() << endl;
   return 0;
 }
@@ -248,7 +248,8 @@ int pbd_cloth_solver::advance() {
   /// --------------------
   for (size_t i = 0; i < MAX_ITER; ++i) {
     double cons_sqr = query_constraint_squared_norm(Xstar.data());
-    cout << "\t@constraint norm: " << cons_sqr << endl;
+    if ( i % 100 == 0 )
+      cout << "\t@constraint norm: " << cons_sqr << endl;
     if ( cons_sqr < 1e-8 ) {
       cout << "\t@converged\n";
       break;
