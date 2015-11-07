@@ -18,6 +18,8 @@ const double H = 0.01;
 
 //#define IMPL_EULER
 
+static opt_args optparam = {10000, 1e-10, false};
+
 int main(int argc, char *argv[])
 {
   if ( argc != 2 ) {
@@ -69,7 +71,7 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     line2vtk(os, &nods[0], nods.size(2), &line[0], line.size(2));
 
-    newton_solve(&nods[0], nods.size(), energy);
+    newton_solve(&nods[0], nods.size(), energy, optparam);
 //    lbfgs_solve(&nods[0], nods.size(), energy);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }

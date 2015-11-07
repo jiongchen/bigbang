@@ -44,6 +44,8 @@ static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
   return 0;
 }
 
+static opt_args optparam = {10000, 1e-10, false};
+
 int main(int argc, char *argv[])
 {
   po::options_description desc("Available options");
@@ -111,7 +113,7 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     hex2vtk(os, &nods[0], nods.size(2), &hexs[0], hexs.size(2));
 
-    newton_solve(&nods[0], nods.size(), energy);
+    newton_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }
 

@@ -50,6 +50,8 @@ static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
 
 //#define IMPL_EULER
 
+static opt_args optparam = {10000, 1e-8, false};
+
 int main(int argc, char *argv[])
 {
   po::options_description desc("Available options");
@@ -106,7 +108,7 @@ int main(int argc, char *argv[])
   vector<shared_ptr<Functional<double>>> ebf(4);
   shared_ptr<Functional<double>> energy;
 #ifdef IMPL_EULER
-  ebf[0] = make_shared<momentum_potential_imp_euler>(tets, nods, RHO, H, 1e0);
+  ebf[0] = make_shared<momentum_potential_imp_euler>(tets, nods, args.density, args.timestep, 1e0);
 #else
   ebf[0] = make_shared<momentum_potential_bdf2>(tets, nods, args.density, args.timestep, 1e0);
 #endif
@@ -131,7 +133,7 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
 
-    newton_solve(&nods[0], nods.size(), energy);
+    newton_solve(&nods[0], nods.size(), energy, optparam);
 //    lbfgs_solve(&nods[0], nods.size(), energy);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }

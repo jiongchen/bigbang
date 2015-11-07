@@ -11,13 +11,22 @@ class Functional;
 template <typename T>
 class Constraint;
 
-int newton_solve(double *x, const size_t dim, std::shared_ptr<Functional<double>> &f);
+struct opt_args {
+  size_t max_iter;
+  double eps;
+  bool lineseach;
+};
 
-int lbfgs_solve(double *x, const size_t dim, std::shared_ptr<Functional<double>> &f);
+using pfunc=std::shared_ptr<Functional<double>>;
+using pcons=std::shared_ptr<Constraint<double>>;
 
-int constrained_newton_solve(double *x, const size_t dim, std::shared_ptr<Functional<double>> &f, std::shared_ptr<Constraint<double>> &c);
+int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &args);
 
-int gauss_newton_solve(double *x, const size_t dim, std::shared_ptr<Constraint<double>> &f);
+int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args *args);
+
+int constrained_newton_solve(double *x, const size_t dim, const pfunc &f, const pcons &c);
+
+int gauss_newton_solve(double *x, const size_t dim, const pcons &f);
 
 }
 #endif
