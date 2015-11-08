@@ -39,6 +39,9 @@ if(LBFGS_FOUND)
     include_directories(${LBFGS_INCLUDE_DIRS})
 endif(LBFGS_FOUND)
 
+# ARPACK
+find_package(Arpack REQUIRED)
+
 add_subdirectory(src)
 add_subdirectory(examples)
 

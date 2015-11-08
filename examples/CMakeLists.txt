@@ -47,3 +47,9 @@ target_link_libraries(test_embedded_fem
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_modal_basis test_modal_basis.cc)
+target_link_libraries(test_modal_basis
+    bigbang
+    ${Boost_LIBRARIES}
+)

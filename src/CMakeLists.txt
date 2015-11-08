@@ -28,4 +28,5 @@ target_link_libraries(bigbang
     ${UMFPACK_LIBRARIES}
     HLBFGS
     ${LBFGS_LIBRARIES}
+    ${ARPACK_LIBRARIES}
 )
