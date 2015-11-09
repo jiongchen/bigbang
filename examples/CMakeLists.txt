@@ -53,3 +53,9 @@ target_link_libraries(test_modal_basis
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_cloth test_cloth.cc)
+target_link_libraries(test_cloth
+    bigbang
+    ${Boost_LIBRARIES}
+)

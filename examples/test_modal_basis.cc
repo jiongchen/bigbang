@@ -13,7 +13,7 @@ using namespace zjucad::matrix;
 using namespace Eigen;
 using namespace bigbang;
 
-static size_t numBase = 60;
+static size_t numBase = 100;
 
 static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
   fixed.clear();

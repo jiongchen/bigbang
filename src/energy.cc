@@ -45,6 +45,14 @@ void mass_spring_(double *val, const double *x, const double *d);
 void mass_spring_jac_(double *jac, const double *x, const double *d);
 void mass_spring_hes_(double *hes, const double *x, const double *d);
 
+void calc_dih_angle_(double *val, const double *x);
+void calc_dih_angle_jac_(double *jac, const double *x);
+void calc_dih_angle_hes_(double *hes, const double *x);
+
+void surf_bending_(double *val, const double *x, const double *l, const double *area);
+void surf_bending_jac_(double *jac, const double *x, const double *l, const double *area);
+void surf_bending_hes_(double *hes, const double *x, const double *l, const double *area);
+
 void line_bending_(double *val, const double *x, const double *d1, const double *d2);
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
 void line_bending_hes_(double *hes, const double *x, const double *d1, const double *d2);
@@ -459,7 +467,7 @@ int spring_potential::Val(const double *x, double *val) const {
     matd_t vert = X(colon(), edge_(colon(), i));
     double value = 0;
     mass_spring_(&value, &vert[0], &len_[i]);
-    *val += value;
+    *val += w_*value;
   }
   return 0;
 }
@@ -483,11 +491,86 @@ int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
   for (size_t i = 0; i < edge_.size(2); ++i) {
     matd_t vert = X(colon(), edge_(colon(), i));
     matd_t H = zeros<double>(6, 6);
-    mass_spring_hes_(&H[0], &vert[0], &len_[i]);
+    double curr = 0;
+    calc_edge_length_(&curr, &vert[0]);
+    if ( curr < len_[i] ) {
+      matd_t g = zeros<double>(6, 1);
+      double energy = 0;
+      mass_spring_(&energy, &vert[0], &len_[i]);
+      if ( energy < 1e-16 ) {
+        calc_edge_length_jac_(&g[0], &vert[0]);
+        g /= sqrt(len_[i]);
+      } else {
+        mass_spring_jac_(&g[0], &vert[0], &len_[i]);
+        g /= 2*sqrt(energy);
+      }
+      H = 2*g*trans(g);
+    } else {
+      mass_spring_hes_(&H[0], &vert[0], &len_[i]);
+    }
     for (size_t p = 0; p < 6; ++p) {
       for (size_t q = 0; q < 6; ++q) {
         const size_t I = 3*edge_(p/3, i)+p%3;
         const size_t J = 3*edge_(q/3, i)+q%3;
+        if ( H(p, q) != 0.0 )
+          hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
+}
+//==============================================================================
+surf_bending_potential::surf_bending_potential(const mati_t &diams, const matd_t &nods, const double w)
+  : dim_(nods.size()), diams_(diams), w_(w) {
+  len_.resize(diams_.size(2), 1);
+  angle_.resize(diams_.size(2), 1);
+  area_.resize(diams_.size(2), 1);
+#pragma omp parallel for
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+
+  }
+}
+
+size_t surf_bending_potential::Nx() const {
+  return dim_;
+}
+
+int surf_bending_potential::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, Nx()/3, x);
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t vert = X(colon(), diams_(colon(), i));
+    double value = 0;
+    surf_bending_(&value, &vert[0], &len_[i], &area_[i]);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int surf_bending_potential::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, Nx()/3, x);
+  itr_matrix<double *> G(3, Nx()/3, gra);
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t vert = X(colon(), diams_(colon(), i));
+    matd_t grad = zeros<double>(3, 4);
+    surf_bending_jac_(&grad[0], &vert[0], &len_[i], &area_[i]);
+    G(colon(), diams_(colon(), i)) += w_*grad;
+  }
+  return 0;
+}
+
+int surf_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, Nx()/3, x);
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t vert = X(colon(), diams_(colon(), i));
+    matd_t H = zeros<double>(12, 12);
+    surf_bending_hes_(&H[0], &vert[0], &len_[i], &area_[i]);
+    for (size_t p = 0; p < 12; ++p) {
+      for (size_t q = 0; q < 12; ++q) {
+        const size_t I = 3*diams_(p/3, i)+p%3;
+        const size_t J = 3*diams_(q/3, i)+q%3;
         if ( H(p, q) != 0.0 )
           hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
       }
@@ -560,5 +643,6 @@ int line_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
   }
   return 0;
 }
+//==============================================================================
 //==============================================================================
 }

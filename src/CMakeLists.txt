@@ -20,6 +20,11 @@ add_custom_command(OUTPUT elasticity.f90
     DEPENDS elasticity.mac
 )
 
+add_custom_command(OUTPUT stvk_hess_stiff_tensor.f90
+    COMMAND "maxima" ARGS --userdir=${SRC_DIR} -b stvk_hess_stiff_tensor.mac
+    DEPENDS stvk_hess_stiff_tensor.mac
+)
+
 add_subdirectory(HLBFGS)
 
 add_library(bigbang SHARED ${header} ${source} potential.f90 pbd_cons.f90 elasticity.f90 nnls.c)

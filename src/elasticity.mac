@@ -27,6 +27,34 @@ block(
 )$
 
 block(
+  [X, d],
+  X: genmatrix(X, 3, 4),
+  d: genmatrix(d, 1, 1),
+  l: genmatrix(l, 1, 1),
+  area: genmatrix(area, 1, 1),
+  
+  calc_dih_angle(X) := block(
+    [b, b1x2, b2x3, sint, cost],
+    b: addcol(col(X,2)-col(X,1), col(X,3)-col(X,2), col(X,4)-col(X,3)),
+    b1x2: CROSS(col(b,1), col(b,2)),
+    b2x3: CROSS(col(b,2), col(b,3)),
+    sint: DOT(CROSS(b1x2, b2x3), col(b,2)/NORM(col(b,2))),
+    cost: -DOT(b1x2, b2x3),
+    matrix([ atan2(sint, cost) ])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(calc_dih_angle, [X])),
+  
+  surf_bending(X, d, l, area) := block(
+    [curr],
+    curr: calc_dih_angle(X),
+    (curr-d)^2*3*l^2/area[1,1]
+  ),
+  with_stdout(f, val_jac_hes_to_f90(surf_bending, [X, d, l, area])),
+  
+  return()
+)$
+
+block(
   [X, d1, d2],
   X: genmatrix(X, 3, 4),
   d1: genmatrix(d1, 1, 1),

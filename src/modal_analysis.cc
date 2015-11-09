@@ -86,8 +86,7 @@ int basis_builder::compute(const size_t num, MatrixXd &U, VectorXd &lambda) cons
   solver.SetNumLanczosVectors(0);
   solver.SetTolerance(-1);
   solver.Solve(C_.cols(), num, MakeDefaultOperator(C_));
-  printf("[INFO] arpack %d iter, %d converged, %s\n",
-         solver.num_actual_iterations(), solver.num_converged_eigenvalues(), solver.GetInfo());
+  printf("[INFO] arpack %d iter, %d converged, %s\n", solver.num_actual_iterations(), solver.num_converged_eigenvalues(), solver.GetInfo());
 
   MatrixXd Ut = solver.eigenvectors();
   lambda = solver.eigenvalues();

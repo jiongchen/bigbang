@@ -23,8 +23,8 @@ int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &ar
   Map<VectorXd> X(x, dim);
   VectorXd xstar = X, dx(dim);
   for (size_t iter = 0; iter < args.max_iter; ++iter) {
-    double value = 0;
-    f->Val(&xstar[0], &value); {
+    double value = 0; {
+      f->Val(&xstar[0], &value);
       if ( iter % 100 == 0 ) {
         cout << "\t@iter " << iter << endl;
         cout << "\t@energy value: " << value << endl;
