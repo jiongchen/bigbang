@@ -43,7 +43,7 @@ static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
   return 0;
 }
 
-static opt_args optparam = {10000, 1e-8, false};
+static opt_args optparam = {10000, 1e-8, true};
 
 int main(int argc, char *argv[])
 {
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("total_frame,n", po::value<size_t>()->default_value(200), "set the frame number")
       ("ws", po::value<double>()->default_value(1e2), "set the stretch weight")
-      ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
+      ("wb", po::value<double>()->default_value(1e-3), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
       ("wp", po::value<double>()->default_value(1e3), "set the position weight")
       ;

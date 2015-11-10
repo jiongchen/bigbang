@@ -58,7 +58,7 @@ int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &ar
         h *= 0.5;
         xnew = xstar+h*dx;
         f->Val(&xnew[0], &lhs);
-        rhs = value;//value+h*0.45*(grad.dot(dx));
+        rhs = value+h*0.45*(grad.dot(dx));
       } while ( lhs >= value && h > 1e-12 );
     }
     xstar += h*dx;

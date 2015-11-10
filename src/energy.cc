@@ -8,6 +8,7 @@
 
 #include "mass_matrix.h"
 #include "config.h"
+#include "geom_util.h"
 
 using namespace std;
 using namespace zjucad::matrix;
@@ -49,9 +50,9 @@ void calc_dih_angle_(double *val, const double *x);
 void calc_dih_angle_jac_(double *jac, const double *x);
 void calc_dih_angle_hes_(double *hes, const double *x);
 
-void surf_bending_(double *val, const double *x, const double *l, const double *area);
-void surf_bending_jac_(double *jac, const double *x, const double *l, const double *area);
-void surf_bending_hes_(double *hes, const double *x, const double *l, const double *area);
+void surf_bending_(double *val, const double *x, const double *d, const double *l, const double *area);
+void surf_bending_jac_(double *jac, const double *x, const double *d, const double *l, const double *area);
+void surf_bending_hes_(double *hes, const double *x, const double *d, const double *l, const double *area);
 
 void line_bending_(double *val, const double *x, const double *d1, const double *d2);
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
@@ -497,7 +498,7 @@ int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
       matd_t g = zeros<double>(6, 1);
       double energy = 0;
       mass_spring_(&energy, &vert[0], &len_[i]);
-      if ( energy < 1e-16 ) {
+      if ( false /*energy < 1e-16*/ ) {
         calc_edge_length_jac_(&g[0], &vert[0]);
         g /= sqrt(len_[i]);
       } else {
@@ -527,7 +528,10 @@ surf_bending_potential::surf_bending_potential(const mati_t &diams, const matd_t
   area_.resize(diams_.size(2), 1);
 #pragma omp parallel for
   for (size_t i = 0; i < diams_.size(2); ++i) {
-
+    matd_t vert = nods(colon(), diams_(colon(), i));
+    calc_edge_length_(&len_[i], &vert(0, 1));
+    calc_dih_angle_(&angle_[i], &vert[0]);
+    area_[i] = calc_tri_area(vert(colon(), colon(0, 2)))+calc_tri_area(vert(colon(), colon(1, 3)));
   }
 }
 
@@ -541,7 +545,7 @@ int surf_bending_potential::Val(const double *x, double *val) const {
   for (size_t i = 0; i < diams_.size(2); ++i) {
     matd_t vert = X(colon(), diams_(colon(), i));
     double value = 0;
-    surf_bending_(&value, &vert[0], &len_[i], &area_[i]);
+    surf_bending_(&value, &vert[0], &angle_[i], &len_[i], &area_[i]);
     *val += w_*value;
   }
   return 0;
@@ -554,7 +558,7 @@ int surf_bending_potential::Gra(const double *x, double *gra) const {
   for (size_t i = 0; i < diams_.size(2); ++i) {
     matd_t vert = X(colon(), diams_(colon(), i));
     matd_t grad = zeros<double>(3, 4);
-    surf_bending_jac_(&grad[0], &vert[0], &len_[i], &area_[i]);
+    surf_bending_jac_(&grad[0], &vert[0], &angle_[i], &len_[i], &area_[i]);
     G(colon(), diams_(colon(), i)) += w_*grad;
   }
   return 0;
@@ -566,13 +570,14 @@ int surf_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
   for (size_t i = 0; i < diams_.size(2); ++i) {
     matd_t vert = X(colon(), diams_(colon(), i));
     matd_t H = zeros<double>(12, 12);
-    surf_bending_hes_(&H[0], &vert[0], &len_[i], &area_[i]);
+    surf_bending_hes_(&H[0], &vert[0], &angle_[i], &len_[i], &area_[i]);
     for (size_t p = 0; p < 12; ++p) {
       for (size_t q = 0; q < 12; ++q) {
-        const size_t I = 3*diams_(p/3, i)+p%3;
-        const size_t J = 3*diams_(q/3, i)+q%3;
-        if ( H(p, q) != 0.0 )
+        if ( H(p, q) != 0.0 ) {
+          const size_t I = 3*diams_(p/3, i)+p%3;
+          const size_t J = 3*diams_(q/3, i)+q%3;
           hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+        }
       }
     }
   }
@@ -644,5 +649,34 @@ int line_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
   return 0;
 }
 //==============================================================================
+//==============================================================================
+inextensible_constraint::inextensible_constraint(const mati_t &edge, const matd_t &nods)
+  : dim_(nods.size()), edges_(edge) {
+
+}
+
+size_t inextensible_constraint::Nx() const {
+  return dim_;
+}
+
+size_t inextensible_constraint::Nf() const {
+  return edges_.size(2);
+}
+
+int inextensible_constraint::Val(const double *x, double *val) const {
+  itr_matrix<const double *> X(3, Nx()/3, x);
+#pragma omp parallel for
+  for (size_t i = 0; i < edges_.size(2); ++i) {
+    matd_t vert = X(colon(), edges_(colon(), i));
+    double curr = 0;
+    calc_edge_length_(&curr, &vert[0]);
+    val[i] += curr-len_[i];
+  }
+  return 0;
+}
+
+int inextensible_constraint::Jac(const double *x, const size_t off, vector<Triplet<double>> *jac) const {
+  return 0;
+}
 //==============================================================================
 }

@@ -27,7 +27,7 @@ block(
 )$
 
 block(
-  [X, d],
+  [X, d, l, area],
   X: genmatrix(X, 3, 4),
   d: genmatrix(d, 1, 1),
   l: genmatrix(l, 1, 1),
