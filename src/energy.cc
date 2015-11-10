@@ -584,6 +584,43 @@ int surf_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
   return 0;
 }
 //==============================================================================
+ext_force_energy::ext_force_energy(const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w) {
+  force_ = zeros<double>(dim_, 1);
+}
+
+size_t ext_force_energy::Nx() const {
+  return dim_;
+}
+
+int ext_force_energy::Val(const double *x, double *val) const {
+  itr_matrix<const double *> X(Nx(), 1, x);
+  *val += -w_*dot(force_, X);
+  return 0;
+}
+
+int ext_force_energy::Gra(const double *x, double *gra) const {
+  itr_matrix<const double *> X(Nx(), 1, x);
+  itr_matrix<double *> G(Nx(), 1, gra);
+  G += w_*-force_;
+  return 0;
+}
+
+int ext_force_energy::ApplyForce(const size_t id, const double *f) {
+  if ( id < 0 || id >= Nx()/3 )
+    return __LINE__;
+  std::copy(f, f+3, &force_[3*id]);
+  return 0;
+}
+
+int ext_force_energy::RemoveForce(const size_t id) {
+  if ( id < 0 || id >= Nx()/3 )
+    return __LINE__;
+  std::fill(&force_[3*id+0], &force_[3*id+3], 0);
+  return 0;
+}
+
+//==============================================================================
 line_bending_potential::line_bending_potential(const mati_t &edge, const matd_t &nods, const double w)
   : dim_(nods.size()), w_(w), edge_(edge) {
   len_.resize(edge_.size(2), 1);

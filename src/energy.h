@@ -21,6 +21,9 @@ public:
   virtual int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const = 0;
   virtual void Update(const double *x) = 0;
   virtual double QueryKineticEnergy() const = 0;
+  virtual const Eigen::SparseMatrix<double>& MassMatrix() const = 0;
+  virtual const Eigen::VectorXd& CurrVelocity() const = 0;
+  virtual double timestep() const = 0;
 };
 
 class momentum_potential_imp_euler : public momentum_potential
@@ -34,6 +37,9 @@ public:
   void Init(const double *x0, const double *v0);
   void Update(const double *x);
   double QueryKineticEnergy() const;
+  const Eigen::SparseMatrix<double>& MassMatrix() const { return M_; }
+  const Eigen::VectorXd& CurrVelocity() const { return vn_; }
+  double timestep() const { return h_; }
 private:
   const double rho_, h_;
   const size_t dim_;
@@ -53,6 +59,9 @@ public:
   void Init(const double *x0, const double *v0);
   void Update(const double *x);
   double QueryKineticEnergy() const;
+  const Eigen::SparseMatrix<double>& MassMatrix() const { return M_; }
+  const Eigen::VectorXd& CurrVelocity() const { return vn_; }
+  double timestep() const { return h_; }
 private:
   const double rho_, h_;
   const size_t dim_;
@@ -143,6 +152,7 @@ public:
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void ResetWeight(const double w) { w_ = w; }
 private:
   const size_t dim_;
   double w_;
@@ -173,11 +183,28 @@ public:
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void ResetWeight(const double w) { w_ = w; }
 private:
   const size_t dim_;
   double w_;
   const mati_t &diams_;
   matd_t len_, area_, angle_;
+};
+
+class ext_force_energy : public Functional<double>
+{
+public:
+  ext_force_energy(const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const { return 0; }
+  int ApplyForce(const size_t id, const double *f);
+  int RemoveForce(const size_t id);
+private:
+  const size_t dim_;
+  double w_;
+  matd_t force_;
 };
 
 /// !@todo

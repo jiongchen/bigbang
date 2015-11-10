@@ -27,6 +27,8 @@ struct argument {
   double ws, wb, wg, wp;
 };
 
+static opt_args optparam = {10000, 1e-8, true};
+
 static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
   fixed.clear();
   ifstream ifs(filename);
@@ -43,7 +45,13 @@ static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
   return 0;
 }
 
-static opt_args optparam = {10000, 1e-8, true};
+#define APPLY_FORCE(frame, id, f)                                      \
+  if ( i == frame )                                                    \
+    dynamic_pointer_cast<ext_force_energy>(ebf[5])->ApplyForce(id, f);
+
+#define REMOVE_FORCE(frame, id)                                      \
+  if ( i == frame )                                                  \
+    dynamic_pointer_cast<ext_force_energy>(ebf[5])->RemoveForce(id);
 
 int main(int argc, char *argv[])
 {
@@ -96,18 +104,15 @@ int main(int argc, char *argv[])
   get_diam_elem(tris, diams);
 
   // assemble energies
-  vector<shared_ptr<Functional<double>>> ebf(5);
+  vector<shared_ptr<Functional<double>>> ebf(6);
   shared_ptr<Functional<double>> energy;
-#define IMPL_EULER
-#ifdef IMPL_EULER
   ebf[0] = make_shared<momentum_potential_imp_euler>(tris, nods, args.density, args.timestep, 1e0);
-#else
-  ebf[0] = make_shared<momentum_potential_bdf2>(tets, nods, args.density, args.timestep, 1e0);
-#endif
+//  ebf[0] = make_shared<momentum_potential_bdf2>(tets, nods, args.density, args.timestep, 1e0);
   ebf[1] = make_shared<spring_potential>(edges, nods, args.ws);
   ebf[2] = make_shared<surf_bending_potential>(diams, nods, args.wb);
   ebf[3] = make_shared<gravitational_potential>(tris, nods, args.density, args.wg);
   ebf[4] = make_shared<positional_potential>(fixed, nods, args.wp);
+  ebf[5] = make_shared<ext_force_energy>(nods, 1e0);
   try {
     energy = make_shared<energy_t<double>>(ebf);
   } catch ( exception &e ) {
@@ -116,11 +121,15 @@ int main(int argc, char *argv[])
   }
 
   char outfile[256];
+  double f[3] = {-200, 0, -200};
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
     sprintf(outfile, "%s/frame_%zu.vtk", args.output_folder.c_str(), i);
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
+
+    APPLY_FORCE(0, 3, f);
+    REMOVE_FORCE(40, 3);
 
     newton_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
