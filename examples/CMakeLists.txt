@@ -59,3 +59,9 @@ target_link_libraries(test_cloth
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_upsampling test_upsampling.cc)
+target_link_libraries(test_upsampling
+    bigbang
+    ${Boost_LIBRARIES}
+)
