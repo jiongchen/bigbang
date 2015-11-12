@@ -10,6 +10,7 @@
 #include "src/vtk.h"
 #include "src/optimizer.h"
 #include "src/energy.h"
+#include "src/io.h"
 
 using namespace std;
 using namespace bigbang;
@@ -31,22 +32,6 @@ struct argument {
   double wg;
   double wp;
 };
-
-static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
-  fixed.clear();
-  ifstream ifs(filename);
-  if ( ifs.fail() ) {
-    cerr << "[error] can not open " << filename << endl;
-    return __LINE__;
-  }
-  size_t temp;
-  while ( ifs >> temp ) {
-    fixed.push_back(temp);
-  }
-  cout << "[info] fixed verts number: " << fixed.size() << endl;
-  ifs.close();
-  return 0;
-}
 
 //#define IMPL_EULER
 
@@ -115,7 +100,7 @@ int main(int argc, char *argv[])
   ebf[1] = make_shared<elastic_potential>(tets, nods, elastic_potential::STVK,
                                           args.young_modulus, args.poisson_ratio, args.we);
   ebf[2] = make_shared<gravitational_potential>(tets, nods, args.density, args.wg);
-  ebf[3] = make_shared<positional_potential>(fixed, nods, args.wp);
+  ebf[3] = make_shared<positional_potential>(nods, args.wp);
   try {
     energy = make_shared<energy_t<double>>(ebf);
   } catch ( exception &e ) {
@@ -125,6 +110,8 @@ int main(int argc, char *argv[])
 
 //  vector<shared_ptr<Constraint<double>>> cbf(1);
 //  shared_ptr<Constraint<double>> constraint;
+
+  // boudary conditions
 
   char outfile[256];
   for (size_t i = 0; i < args.total_frame; ++i) {

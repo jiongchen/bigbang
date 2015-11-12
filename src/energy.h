@@ -3,6 +3,7 @@
 
 #include <zjucad/matrix/matrix.h>
 #include <Eigen/Sparse>
+#include <unordered_map>
 
 #include "def.h"
 
@@ -132,16 +133,17 @@ private:
 class positional_potential : public Functional<double>
 {
 public:
-  positional_potential(const std::vector<size_t> &fixed, const matd_t &p, const double w);
+  positional_potential(const matd_t &nods, const double w);
   size_t Nx() const;
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  int Pin(const size_t id, const double *pos);
+  int Release(const size_t id);
 private:
   const size_t dim_;
   double w_;
-  const matd_t p_;
-  const std::vector<size_t> &fixed_;
+  std::unordered_map<size_t, Eigen::Vector3d> fixed_;
 };
 
 class spring_potential : public Functional<double>
@@ -215,7 +217,17 @@ class quadratic_bending_potential : public Functional<double>
 
 class position_constraint : public Constraint<double>
 {
-
+public:
+  position_constraint(const matd_t &nods);
+  size_t Nx() const;
+  size_t Nf() const;
+  int Val(const double *x, double *val) const;
+  int Jac(const double *x, const size_t off, std::vector<Eigen::Triplet<double>> *jac) const;
+  int Pin(const size_t pid, const double *pos);
+  int Release(const size_t pid);
+private:
+  const size_t dim_;
+  std::unordered_map<size_t, Eigen::Vector3d> fixed_;
 };
 
 class inextensible_constraint : public Constraint<double>

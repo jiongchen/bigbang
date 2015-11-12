@@ -40,8 +40,6 @@ int main(int argc, char *argv[])
     line2vtk(os, &nods[0], nods.size(2), &line[0], line.size(2));
   }
 
-  vector<size_t> fixed_vert{0, SEGS};
-
   // assemble energies
   vector<shared_ptr<Functional<double>>> ebf(5);
   shared_ptr<Functional<double>> energy;
@@ -53,13 +51,18 @@ int main(int argc, char *argv[])
   ebf[1] = make_shared<spring_potential>(line, nods, 1e2);
   ebf[2] = make_shared<line_bending_potential>(line, nods, 1e-1);
   ebf[3] = make_shared<gravitational_potential>(line, nods, RHO, 1.0);
-  ebf[4] = make_shared<positional_potential>(fixed_vert, nods, 1e3);
+  ebf[4] = make_shared<positional_potential>(nods, 1e3);
   try {
     energy = make_shared<energy_t<double>>(ebf);
   } catch ( exception &e ) {
     cerr << e.what() << endl;
     exit(EXIT_FAILURE);
   }
+
+  // initial boundary conditions
+  vector<size_t> fixed_vert{0, SEGS};
+  for (auto &id : fixed_vert)
+    dynamic_pointer_cast<positional_potential>(ebf[4])->Pin(id, &nods(0, id));
 
   // give initial value
 

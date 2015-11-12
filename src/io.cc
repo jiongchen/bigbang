@@ -8,6 +8,22 @@ using namespace zjucad::matrix;
 
 namespace bigbang {
 
+int read_fixed_verts(const char *filename, std::vector<size_t> &fixed) {
+  fixed.clear();
+  ifstream ifs(filename);
+  if ( ifs.fail() ) {
+    cerr << "[error] can not open " << filename << endl;
+    return __LINE__;
+  }
+  size_t temp;
+  while ( ifs >> temp ) {
+    fixed.push_back(temp);
+  }
+  cout << "[info] fixed verts number: " << fixed.size() << endl;
+  ifs.close();
+  return 0;
+}
+
 int hex_mesh_read_from_vtk(const char *path, matd_t *node, mati_t *hex) {
   ifstream ifs(path);
   if(ifs.fail()) {

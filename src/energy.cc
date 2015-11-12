@@ -410,8 +410,8 @@ int voxel_elastic_potential::Hes(const double *x, vector<Triplet<double>> *hes) 
   return 0;
 }
 //==============================================================================
-positional_potential::positional_potential(const std::vector<size_t> &fixed, const matd_t &p, const double w)
-  : dim_(p.size()), w_(w), fixed_(fixed), p_(p) {}
+positional_potential::positional_potential(const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w) {}
 
 size_t positional_potential::Nx() const {
   return dim_;
@@ -420,32 +420,56 @@ size_t positional_potential::Nx() const {
 int positional_potential::Val(const double *x, double *val) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
   Map<const MatrixXd> X(x, 3, dim_/3);
-  Map<const MatrixXd> P(&p_[0], 3, dim_/3);
-  for (auto &id : fixed_) {
-    *val += 0.5*w_*(X.col(id)-P.col(id)).squaredNorm();
+  for (auto &elem : fixed_) {
+    const size_t id = elem.first;
+    *val += 0.5*w_*(X.col(id)-elem.second).squaredNorm();
   }
   return 0;
 }
 
 int positional_potential::Gra(const double *x, double *gra) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
-  itr_matrix<const double *> X(3, dim_/3, x);
-  itr_matrix<double *> G(3, dim_/3, gra);
-  for (auto &id : fixed_) {
-    G(colon(), id) += w_*(X(colon(), id)-p_(colon(), id));
+  Map<const MatrixXd> X(x, 3, dim_/3);
+  Map<MatrixXd> G(gra, 3, dim_/3);
+  for (auto &elem : fixed_) {
+    const size_t id = elem.first;
+    G.col(id) += w_*(X.col(id)-elem.second);
   }
   return 0;
 }
 
 int positional_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
-  for (auto &id : fixed_) {
+  for (auto &elem : fixed_) {
+    const size_t id = elem.first;
     hes->push_back(Triplet<double>(3*id+0, 3*id+0, w_));
     hes->push_back(Triplet<double>(3*id+1, 3*id+1, w_));
     hes->push_back(Triplet<double>(3*id+2, 3*id+2, w_));
   }
   return 0;
 }
+
+int positional_potential::Pin(const size_t id, const double *pos) {
+  if ( id < 0 || id >= Nx()/3 )
+    return __LINE__;
+  fixed_.insert(make_pair(id, Vector3d(pos)));
+  return 0;
+}
+
+int positional_potential::Release(const size_t id) {
+  if ( id < 0 || id >= Nx()/3 ) {
+    cerr << "[info] vertex index is out of range\n";
+    return __LINE__;
+  }
+  auto it = fixed_.find(id);
+  if ( it == fixed_.end() ) {
+    cerr << "[info] vertex " << id << " is not fixed\n";
+    return __LINE__;
+  }
+  fixed_.erase(it);
+  return 0;
+}
+
 //==============================================================================
 spring_potential::spring_potential(const mati_t &edge, const matd_t &nods, const double w)
   : dim_(nods.size()), w_(w), edge_(edge) {

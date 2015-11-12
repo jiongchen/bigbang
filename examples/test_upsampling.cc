@@ -7,12 +7,12 @@
 using namespace std;
 namespace po=boost::program_options;
 
-int coarse_offline_sim(po::variables_map &vm) {
+int offline_coarse_sim(po::variables_map &vm) {
   cout << "[info] coarse offline sim\n";
   return 0;
 }
 
-int fine_offline_sim(po::variables_map &vm) {
+int offline_fine_track_sim(po::variables_map &vm) {
   cout << "[info] fine offline sim\n";
   return 0;
 }
@@ -43,10 +43,10 @@ int main(int argc, char *argv[])
   }
 
   const string prog_name = vm["program"].as<string>();
-  if ( prog_name == "coarse_offline_sim" )
-    return coarse_offline_sim(vm);
-  if ( prog_name == "fine_offline_sim" )
-    return fine_offline_sim(vm);
+  if ( prog_name == "offline_coarse_sim" )
+    return offline_coarse_sim(vm);
+  if ( prog_name == "offline_fine_track_sim" )
+    return offline_fine_track_sim(vm);
   if ( prog_name == "upsampling" )
     return upsampling(vm);
   if ( prog_name == "online_sim" )

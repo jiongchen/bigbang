@@ -3,10 +3,10 @@
 exe=../build/bin/test_upsampling
 
 echo -e "\033[31m"
-$exe -p coarse_offline_sim
+$exe -p offline_coarse_sim
 
 echo -e "\033[32m"
-$exe -p fine_offline_sim
+$exe -p offline_fine_track_sim
 
 echo -e "\033[33m"
 $exe -p upsampling

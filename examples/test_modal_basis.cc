@@ -7,6 +7,7 @@
 #include "src/modal_analysis.h"
 #include "src/energy.h"
 #include "src/vtk.h"
+#include "src/io.h"
 
 using namespace std;
 using namespace zjucad::matrix;
@@ -14,22 +15,6 @@ using namespace Eigen;
 using namespace bigbang;
 
 static size_t numBase = 100;
-
-static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
-  fixed.clear();
-  ifstream ifs(filename);
-  if ( ifs.fail() ) {
-    cerr << "[error] can not open " << filename << endl;
-    return __LINE__;
-  }
-  size_t temp;
-  while ( ifs >> temp ) {
-    fixed.push_back(temp);
-  }
-  cout << "[info] fixed verts number: " << fixed.size() << endl;
-  ifs.close();
-  return 0;
-}
 
 int main(int argc, char *argv[])
 {

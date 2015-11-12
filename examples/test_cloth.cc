@@ -11,6 +11,7 @@
 #include "src/optimizer.h"
 #include "src/energy.h"
 #include "src/geom_util.h"
+#include "src/io.h"
 
 using namespace std;
 using namespace bigbang;
@@ -28,22 +29,6 @@ struct argument {
 };
 
 static opt_args optparam = {10000, 1e-8, true};
-
-static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
-  fixed.clear();
-  ifstream ifs(filename);
-  if ( ifs.fail() ) {
-    cerr << "[error] can not open " << filename << endl;
-    return __LINE__;
-  }
-  size_t temp;
-  while ( ifs >> temp ) {
-    fixed.push_back(temp);
-  }
-  cout << "[info] fixed verts number: " << fixed.size() << endl;
-  ifs.close();
-  return 0;
-}
 
 #define APPLY_FORCE(frame, id, f)                                      \
   if ( i == frame )                                                    \
@@ -98,7 +83,7 @@ int main(int argc, char *argv[])
   vector<size_t> fixed;
   read_fixed_verts(args.input_cons.c_str(), fixed);
 
-  // extract
+  // extract elements
   mati_t edges, diams;
   get_edge_elem(tris, edges);
   get_diam_elem(tris, diams);
@@ -107,17 +92,21 @@ int main(int argc, char *argv[])
   vector<shared_ptr<Functional<double>>> ebf(6);
   shared_ptr<Functional<double>> energy;
   ebf[0] = make_shared<momentum_potential_imp_euler>(tris, nods, args.density, args.timestep, 1e0);
-//  ebf[0] = make_shared<momentum_potential_bdf2>(tets, nods, args.density, args.timestep, 1e0);
   ebf[1] = make_shared<spring_potential>(edges, nods, args.ws);
   ebf[2] = make_shared<surf_bending_potential>(diams, nods, args.wb);
   ebf[3] = make_shared<gravitational_potential>(tris, nods, args.density, args.wg);
-  ebf[4] = make_shared<positional_potential>(fixed, nods, args.wp);
+  ebf[4] = make_shared<positional_potential>(nods, args.wp);
   ebf[5] = make_shared<ext_force_energy>(nods, 1e0);
   try {
     energy = make_shared<energy_t<double>>(ebf);
   } catch ( exception &e ) {
     cerr << e.what() << endl;
     exit(EXIT_FAILURE);
+  }
+
+  // initial boudary conditions
+  for (auto &id : fixed) {
+    dynamic_pointer_cast<positional_potential>(ebf[4])->Pin(id, &nods(0, id));
   }
 
   char outfile[256];

@@ -28,22 +28,6 @@ struct argument {
   double poisson_ratio;
 };
 
-static int read_fixed_verts(const char *filename, vector<size_t> &fixed) {
-  fixed.clear();
-  ifstream ifs(filename);
-  if ( ifs.fail() ) {
-    cerr << "[error] can not open " << filename << endl;
-    return __LINE__;
-  }
-  size_t temp;
-  while ( ifs >> temp ) {
-    fixed.push_back(temp);
-  }
-  cout << "[info] fixed verts number: " << fixed.size() << endl;
-  ifs.close();
-  return 0;
-}
-
 static opt_args optparam = {10000, 1e-10, false};
 
 int main(int argc, char *argv[])
@@ -98,7 +82,7 @@ int main(int argc, char *argv[])
   ebf[1] = make_shared<voxel_elastic_potential>
       (hexs, nods, voxel_elastic_potential::STVK, args.young_modulus, args.poisson_ratio, 1e0);
   ebf[2] = make_shared<gravitational_potential>(hexs, nods, args.density, 1e0);
-  ebf[3] = make_shared<positional_potential>(fixed, nods, 1e3);
+  ebf[3] = make_shared<positional_potential>(nods, 1e3);
   try {
     energy = make_shared<energy_t<double>>(ebf);
   } catch ( exception &e ) {
