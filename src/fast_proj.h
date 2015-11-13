@@ -26,18 +26,18 @@ struct cloth_args {
 class cloth_solver
 {
 public:
-  cloth_solver(const mati_t &tris, const matd_t &nods, cloth_args &args);
-  int initialize();
-  void fix_vert(const size_t id, const double *pos);
+  cloth_solver(const mati_t &tris, const matd_t &nods);
+  int initialize(const cloth_args &args);
+  void pin_down_vert(const size_t id, const double *pos);
   void release_vert(const size_t id);
-  void apply_point_force(const size_t id, const double *f);
-  void release_point_force(const size_t id);
+  void apply_force(const size_t id, const double *f);
+  void release_force(const size_t id);
   int advance(double *x, const size_t dim) const;
 private:
   const size_t dim_;
   const mati_t &tris_;
   const matd_t &nods_;
-  cloth_args &args_;
+  cloth_args args_;
   mati_t edges_, diams_;
 
   Eigen::SparseMatrix<double> M_;

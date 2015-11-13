@@ -30,13 +30,17 @@ struct argument {
 
 static opt_args optparam = {10000, 1e-8, true};
 
-#define APPLY_FORCE(frame, id, f)                                      \
-  if ( i == frame )                                                    \
+#define APPLY_FORCE(frame, id, f)                                     \
+  if ( i == frame )                                                   \
     dynamic_pointer_cast<ext_force_energy>(ebf[5])->ApplyForce(id, f);
 
-#define REMOVE_FORCE(frame, id)                                      \
-  if ( i == frame )                                                  \
+#define REMOVE_FORCE(frame, id)                                       \
+  if ( i == frame )                                                   \
     dynamic_pointer_cast<ext_force_energy>(ebf[5])->RemoveForce(id);
+
+#define RELEASE_VERT(frame, id)                                       \
+  if ( i == frame )                                                   \
+    dynamic_pointer_cast<positional_potential>(ebf[4])->Release(id);
 
 int main(int argc, char *argv[])
 {
@@ -119,6 +123,7 @@ int main(int argc, char *argv[])
 
     APPLY_FORCE(0, 3, f);
     REMOVE_FORCE(40, 3);
+    RELEASE_VERT(160, 2);
 
     newton_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);

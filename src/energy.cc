@@ -452,7 +452,7 @@ int positional_potential::Hes(const double *x, vector<Triplet<double>> *hes) con
 int positional_potential::Pin(const size_t id, const double *pos) {
   if ( id < 0 || id >= Nx()/3 )
     return __LINE__;
-  fixed_.insert(make_pair(id, Vector3d(pos)));
+  fixed_[id] = Vector3d(pos);
   return 0;
 }
 
@@ -710,18 +710,63 @@ int line_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
   return 0;
 }
 //==============================================================================
+position_constraint::position_constraint(const matd_t &nods, const double w)
+  : w_(sqrt(w)), dim_(nods.size()) {}
+
+int position_constraint::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(Nf() == 0);
+  Map<const MatrixXd> X(x, 3, Nx()/3);
+  Map<VectorXd> value(val, Nf());
+  size_t cnt = 0;
+  for (auto &elem : fixed_) {
+    value.segment<3>(3*cnt) += w_*(X.col(elem.first)-elem.second);
+    ++cnt;
+  }
+  return 0;
+}
+
+int position_constraint::Jac(const double *x, const size_t off, vector<Triplet<double>> *jac) const {
+  RETURN_WITH_COND_TRUE(Nf() == 0);
+  size_t cnt = 0;
+  for (auto &elem : fixed_) {
+    jac->push_back(Triplet<double>(off+cnt++, 3*elem.first+0, w_));
+    jac->push_back(Triplet<double>(off+cnt++, 3*elem.first+1, w_));
+    jac->push_back(Triplet<double>(off+cnt++, 3*elem.first+2, w_));
+  }
+  return 0;
+}
+
+int position_constraint::Pin(const size_t pid, const double *pos) {
+  if ( pid < 0 || pid >= Nx()/3 ) {
+    cerr << "[info] point ID is out of range\n";
+    return __LINE__;
+  }
+  fixed_[pid] = Vector3d(pos);
+  return 0;
+}
+
+int position_constraint::Release(const size_t pid) {
+  if ( pid < 0 || pid >= Nx()/3 ) {
+    cerr << "[info] point ID is out of range\n";
+    return __LINE__;
+  }
+  auto it = fixed_.find(pid);
+  if ( it == fixed_.end() ) {
+    cerr << "[info] point " << pid << " is not fixed\n";
+    return __LINE__;
+  }
+  fixed_.erase(it);
+  return 0;
+}
+
 //==============================================================================
-inextensible_constraint::inextensible_constraint(const mati_t &edge, const matd_t &nods)
-  : dim_(nods.size()), edges_(edge) {
-
-}
-
-size_t inextensible_constraint::Nx() const {
-  return dim_;
-}
-
-size_t inextensible_constraint::Nf() const {
-  return edges_.size(2);
+inextensible_constraint::inextensible_constraint(const mati_t &edge, const matd_t &nods, const double w)
+  : w_(w), dim_(nods.size()), edges_(edge) {
+#pragma omp parallel for
+  for (size_t i = 0; i < edges_.size(2); ++i) {
+    matd_t vert = nods(colon(), edges_(colon(), i));
+    calc_edge_length_(&len_[i], &vert[0]);
+  }
 }
 
 int inextensible_constraint::Val(const double *x, double *val) const {

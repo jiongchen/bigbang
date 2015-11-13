@@ -218,14 +218,15 @@ class quadratic_bending_potential : public Functional<double>
 class position_constraint : public Constraint<double>
 {
 public:
-  position_constraint(const matd_t &nods);
-  size_t Nx() const;
-  size_t Nf() const;
+  position_constraint(const matd_t &nods, const double w=1.0);
+  size_t Nx() const { return dim_; }
+  size_t Nf() const { return 3*fixed_.size(); }
   int Val(const double *x, double *val) const;
   int Jac(const double *x, const size_t off, std::vector<Eigen::Triplet<double>> *jac) const;
   int Pin(const size_t pid, const double *pos);
   int Release(const size_t pid);
 private:
+  double w_;
   const size_t dim_;
   std::unordered_map<size_t, Eigen::Vector3d> fixed_;
 };
@@ -233,12 +234,13 @@ private:
 class inextensible_constraint : public Constraint<double>
 {
 public:
-  inextensible_constraint(const mati_t &edge, const matd_t &nods);
-  size_t Nx() const;
-  size_t Nf() const;
+  inextensible_constraint(const mati_t &edge, const matd_t &nods, const double w=1.0);
+  size_t Nx() const { return dim_; }
+  size_t Nf() const { return edges_.size(2); }
   int Val(const double *x, double *val) const;
   int Jac(const double *x, const size_t off, std::vector<Eigen::Triplet<double>> *jac) const;
 private:
+  double w_;
   const size_t dim_;
   const mati_t &edges_;
   matd_t len_;
