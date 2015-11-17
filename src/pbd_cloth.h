@@ -6,6 +6,7 @@
 
 namespace bigbang {
 
+template <typename T>
 class constraint_piece;
 
 class pbd_cloth_solver
@@ -50,7 +51,7 @@ private:
   vec_t Minv_;
   vec_t vel_, fext_, grav_;
   double h_, rho_;
-  std::vector<std::shared_ptr<constraint_piece>> buff_, coll_;
+  std::vector<std::shared_ptr<constraint_piece<double>>> buff_, coll_;
 
   const size_t MAX_ITER = 10000;
 };

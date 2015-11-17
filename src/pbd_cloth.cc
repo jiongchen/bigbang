@@ -64,24 +64,7 @@ static void get_dihedral_elements(const mati_t &tris, mati_t &ele) {
   }
 }
 
-class constraint_piece
-{
-public:
-  enum cons_type {
-    EQUAL,
-    GREATER
-  };
-  constraint_piece(const mati_t &pn, const double k, const cons_type type) : pn_(pn), k_(k), type_(type) {}
-  virtual ~constraint_piece() {}
-  virtual size_t dim() const = 0;
-  virtual int eval_val(const double *x, double *val) const = 0;
-  virtual int eval_jac(const double *x, double *jac) const = 0;
-  const mati_t pn_;
-  const double k_;
-  const cons_type type_;
-};
-
-class stretch_cons : public constraint_piece
+class stretch_cons : public constraint_piece<double>
 {
 public:
   stretch_cons(const mati_t &edge, const matd_t &nods, const double k, const cons_type type=EQUAL)
@@ -109,7 +92,7 @@ private:
   double len_;
 };
 
-class bend_cons : public constraint_piece
+class bend_cons : public constraint_piece<double>
 {
 public:
   bend_cons(const mati_t &dia, const matd_t &nods, const double k, const cons_type type=EQUAL)
@@ -219,7 +202,8 @@ int pbd_cloth_solver::project_constraints(vec_t &x, const size_t iter_num) {
     co->eval_val(x.data(), &val);
     if ( val == 0.0 )
       continue;
-    if ( co->type_ == constraint_piece::EQUAL || (co->type_ == constraint_piece::GREATER && val < 0.0) ) {
+    if ( co->type_ == constraint_piece<double>::EQUAL
+         || (co->type_ == constraint_piece<double>::GREATER && val < 0.0) ) {
       matd_t jac = zeros<double>(3, co->pn_.size());
       co->eval_jac(&X[0], &jac[0]);
       double s = 0;

@@ -3,6 +3,7 @@
 
 #include <Eigen/Sparse>
 #include <memory>
+#include <zjucad/matrix/matrix.h>
 
 namespace bigbang {
 
@@ -171,6 +172,25 @@ public:
 protected :
   const std::vector<std::shared_ptr<Constraint<T>>> &buffer_;
   size_t xdim_, fdim_;
+};
+
+template <typename T>
+class constraint_piece
+{
+public:
+  enum cons_type {
+    EQUAL,
+    GREATER
+  };
+  constraint_piece(const zjucad::matrix::matrix<size_t> &pn, const T k, const cons_type type)
+    : pn_(pn), k_(k), type_(type) {}
+  virtual ~constraint_piece() {}
+  virtual size_t dim() const = 0;
+  virtual int eval_val(const T *x, T *val) const = 0;
+  virtual int eval_jac(const T *x, T *jac) const = 0;
+  const zjucad::matrix::matrix<size_t> pn_;
+  const T k_;
+  const cons_type type_;
 };
 
 }
