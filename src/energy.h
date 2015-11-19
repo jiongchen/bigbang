@@ -162,6 +162,23 @@ private:
   matd_t len_;
 };
 
+class fast_mass_spring : public Functional<double>
+{
+public:
+  fast_mass_spring(const mati_t &edge, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void LocalSolve(const double *x);
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &edge_;
+  matd_t len_;
+  matd_t d_;
+};
+
 class line_bending_potential : public Functional<double>
 {
 public:
@@ -200,7 +217,7 @@ public:
   size_t Nx() const;
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
-  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const { return 0; }
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const { return __LINE__; }
   int ApplyForce(const size_t id, const double *f);
   int RemoveForce(const size_t id);
 private:
@@ -209,12 +226,13 @@ private:
   matd_t force_;
 };
 
-/// !@todo
+/// !@todo finish
 class quadratic_bending_potential : public Functional<double>
 {
 
 };
 
+/// !@todo check
 class position_constraint : public Constraint<double>
 {
 public:
@@ -231,6 +249,7 @@ private:
   std::unordered_map<size_t, Eigen::Vector3d> fixed_;
 };
 
+/// !@todo finish
 class inextensible_constraint : public Constraint<double>
 {
 public:

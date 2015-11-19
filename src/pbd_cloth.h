@@ -9,6 +9,10 @@ namespace bigbang {
 template <typename T>
 class constraint_piece;
 
+struct pbd_args {
+  size_t maxiter;
+};
+
 class pbd_cloth_solver
 {
 public:
@@ -53,7 +57,7 @@ private:
   double h_, rho_;
   std::vector<std::shared_ptr<constraint_piece<double>>> buff_, coll_;
 
-  const size_t MAX_ITER = 10000;
+  const size_t MAX_ITER = 10;
 };
 
 }

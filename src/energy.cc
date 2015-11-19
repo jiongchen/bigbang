@@ -9,6 +9,7 @@
 #include "mass_matrix.h"
 #include "config.h"
 #include "geom_util.h"
+#include "util.h"
 
 using namespace std;
 using namespace zjucad::matrix;
@@ -418,7 +419,7 @@ size_t positional_potential::Nx() const {
 }
 
 int positional_potential::Val(const double *x, double *val) const {
-  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  RETURN_WITH_COND_TRUE(w_ == 0.0 || fixed_.empty());
   Map<const MatrixXd> X(x, 3, dim_/3);
   for (auto &elem : fixed_) {
     const size_t id = elem.first;
@@ -428,7 +429,7 @@ int positional_potential::Val(const double *x, double *val) const {
 }
 
 int positional_potential::Gra(const double *x, double *gra) const {
-  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  RETURN_WITH_COND_TRUE(w_ == 0.0 || fixed_.empty());
   Map<const MatrixXd> X(x, 3, dim_/3);
   Map<MatrixXd> G(gra, 3, dim_/3);
   for (auto &elem : fixed_) {
@@ -439,7 +440,7 @@ int positional_potential::Gra(const double *x, double *gra) const {
 }
 
 int positional_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
-  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  RETURN_WITH_COND_TRUE(w_ == 0.0 || fixed_.empty());
   for (auto &elem : fixed_) {
     const size_t id = elem.first;
     hes->push_back(Triplet<double>(3*id+0, 3*id+0, w_));
@@ -543,6 +544,62 @@ int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
     }
   }
   return 0;
+}
+//==============================================================================
+fast_mass_spring::fast_mass_spring(const mati_t &edge, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), edge_(edge) {
+  len_.resize(edge_.size(2), 1);
+  d_.resize(3, edge_.size(2));
+#pragma omp parallel for
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    d_(colon(), i) = nods(colon(), edge_(0, i))-nods(colon(), edge_(1, i));
+    len_[i] = norm(d_(colon(), i));
+  }
+}
+
+size_t fast_mass_spring::Nx() const {
+  return dim_;
+}
+
+int fast_mass_spring::Val(const double *x, double *val) const {
+  itr_matrix<const double *> X(3, dim_/3, x);
+  matd_t e(3, 1);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    e = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
+    *val += 0.5*w_*dot(e, e);
+  }
+  return 0;
+}
+
+int fast_mass_spring::Gra(const double *x, double *gra) const {
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  matd_t e(3, 1);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    e = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
+    G(colon(), edge_(0, i)) += w_*e;
+    G(colon(), edge_(1, i)) += -w_*e;
+  }
+  return 0;
+}
+
+int fast_mass_spring::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    add_diag_block<double, 3>(edge_(0, i), edge_(0, i), w_, hes);
+    add_diag_block<double, 3>(edge_(0, i), edge_(1, i), -w_, hes);
+    add_diag_block<double, 3>(edge_(1, i), edge_(0, i), -w_, hes);
+    add_diag_block<double, 3>(edge_(1, i), edge_(1, i), w_, hes);
+  }
+  return 0;
+}
+
+void fast_mass_spring::LocalSolve(const double *x) {
+  itr_matrix<const double *> X(3, dim_/3, x);
+#pragma omp parallel for
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t e = X(colon(), edge_(0, i))-X(colon(), edge_(1, i));
+    d_(colon(), i) = len_[i]*e/norm(e);
+  }
 }
 //==============================================================================
 surf_bending_potential::surf_bending_potential(const mati_t &diams, const matd_t &nods, const double w)

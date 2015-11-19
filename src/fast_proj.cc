@@ -55,7 +55,7 @@ void cloth_solver::apply_force(const size_t id, const double *f) {
   dynamic_pointer_cast<ext_force_energy>(ebf_[2])->ApplyForce(id, f);
 }
 
-void cloth_solver::release_force(const size_t id) {
+void cloth_solver::remove_force(const size_t id) {
   dynamic_pointer_cast<ext_force_energy>(ebf_[2])->RemoveForce(id);
 }
 

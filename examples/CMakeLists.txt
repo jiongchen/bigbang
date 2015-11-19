@@ -65,3 +65,9 @@ target_link_libraries(test_upsampling
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_proj_dyn test_proj_dyn.cc)
+target_link_libraries(test_proj_dyn
+    bigbang
+    ${Boost_LIBRARIES}
+)

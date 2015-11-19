@@ -31,7 +31,7 @@ public:
   void pin_down_vert(const size_t id, const double *pos);
   void release_vert(const size_t id);
   void apply_force(const size_t id, const double *f);
-  void release_force(const size_t id);
+  void remove_force(const size_t id);
   int advance(double *x, const size_t dim) const;
 private:
   const size_t dim_;
