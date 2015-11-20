@@ -9,9 +9,9 @@ namespace bigbang {
 template <typename>
 class Functional;
 
-using mati_t = zjucad::matrix::matrix<size_t>;
-using matd_t = zjucad::matrix::matrix<double>;
-using pfunc_t = std::shared_ptr<Functional<double>>;
+using mati_t=zjucad::matrix::matrix<size_t>;
+using matd_t=zjucad::matrix::matrix<double>;
+using pfunc_t=std::shared_ptr<Functional<double>>;
 
 struct proj_dyn_args {
   double rho, h;

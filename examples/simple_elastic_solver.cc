@@ -112,6 +112,8 @@ int main(int argc, char *argv[])
 //  shared_ptr<Constraint<double>> constraint;
 
   // boudary conditions
+  for (auto &elem : fixed)
+    dynamic_pointer_cast<positional_potential>(ebf[3])->Pin(elem, &nods(0, elem));
 
   char outfile[256];
   for (size_t i = 0; i < args.total_frame; ++i) {

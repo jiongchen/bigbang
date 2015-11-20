@@ -24,7 +24,7 @@ int proj_dyn_solver::initialize(const proj_dyn_args &args) {
 
   impebf_.resize(5);
   impebf_[0] = make_shared<momentum_potential_imp_euler>(tris_, nods_, args_.rho, args_.h);
-  impebf_[1] = make_shared<fast_mass_spring>(tris_, nods_, args_.ws);
+  impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws);
   impebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
   impebf_[3] = make_shared<gravitational_potential>(tris_, nods_, args_.rho, args_.wg);
   impebf_[4] = make_shared<ext_force_energy>(nods_, 1e0);

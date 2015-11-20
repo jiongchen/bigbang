@@ -90,6 +90,9 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
 
+  for (auto &elem : fixed)
+    dynamic_pointer_cast<positional_potential>(ebf[3])->Pin(elem, &nods(0, elem));
+
   char outfile[256];
   for (size_t i = 0; i < args.frame_num; ++i) {
     cout << "[info] frame " << i << endl;

@@ -226,10 +226,16 @@ private:
   matd_t force_;
 };
 
-/// !@todo finish
-class quadratic_bending_potential : public Functional<double>
+class isometric_bending : public Functional<double>
 {
-
+public:
+  isometric_bending(const mati_t &diams, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const mati_t &diams_;
 };
 
 /// !@todo check

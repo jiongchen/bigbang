@@ -563,10 +563,10 @@ size_t fast_mass_spring::Nx() const {
 
 int fast_mass_spring::Val(const double *x, double *val) const {
   itr_matrix<const double *> X(3, dim_/3, x);
-  matd_t e(3, 1);
+  matd_t dx(3, 1);
   for (size_t i = 0; i < edge_.size(2); ++i) {
-    e = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
-    *val += 0.5*w_*dot(e, e);
+    dx = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
+    *val += 0.5*w_*dot(dx, dx);
   }
   return 0;
 }
@@ -574,11 +574,11 @@ int fast_mass_spring::Val(const double *x, double *val) const {
 int fast_mass_spring::Gra(const double *x, double *gra) const {
   itr_matrix<const double *> X(3, dim_/3, x);
   itr_matrix<double *> G(3, dim_/3, gra);
-  matd_t e(3, 1);
+  matd_t dx(3, 1);
   for (size_t i = 0; i < edge_.size(2); ++i) {
-    e = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
-    G(colon(), edge_(0, i)) += w_*e;
-    G(colon(), edge_(1, i)) += -w_*e;
+    dx = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
+    G(colon(), edge_(0, i)) += w_*dx;
+    G(colon(), edge_(1, i)) -= w_*dx;
   }
   return 0;
 }
@@ -597,8 +597,9 @@ void fast_mass_spring::LocalSolve(const double *x) {
   itr_matrix<const double *> X(3, dim_/3, x);
 #pragma omp parallel for
   for (size_t i = 0; i < edge_.size(2); ++i) {
-    matd_t e = X(colon(), edge_(0, i))-X(colon(), edge_(1, i));
-    d_(colon(), i) = len_[i]*e/norm(e);
+    d_(colon(), i) = X(colon(), edge_(0, i))-X(colon(), edge_(1, i));
+    double dnorm = norm(d_(colon(), i));
+    d_(colon(), i) *= len_[i]/dnorm;
   }
 }
 //==============================================================================
@@ -663,6 +664,26 @@ int surf_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
     }
   }
   return 0;
+}
+//==============================================================================
+isometric_bending::isometric_bending(const mati_t &diams, const matd_t &nods, const double w)
+  {
+
+}
+
+size_t isometric_bending::Nx() const {
+}
+
+int isometric_bending::Val(const double *x, double *val) const {
+
+}
+
+int isometric_bending::Gra(const double *x, double *gra) const {
+
+}
+
+int isometric_bending::Hes(const double *x, vector<Triplet<double>> *hes) const {
+
 }
 //==============================================================================
 ext_force_energy::ext_force_energy(const matd_t &nods, const double w)
