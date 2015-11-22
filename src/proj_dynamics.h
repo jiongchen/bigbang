@@ -44,7 +44,7 @@ private:
   pfunc_t impE_, expE_;
 
   const size_t dim_;
-  Eigen::SparseMatrix<double> LHS_, Minv_;
+  Eigen::SparseMatrix<double> LHS_;
   Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
 };
 

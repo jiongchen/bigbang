@@ -42,12 +42,12 @@ int main(int argc, char *argv[])
       ("input_mesh,i", po::value<string>(), "set the input mesh")
       ("input_cons,c", po::value<string>(), "set the input positional constraints")
       ("output_folder,o", po::value<string>(), "set the output folder")
-      ("total_frame,n", po::value<size_t>()->default_value(200), "set the frame number")
+      ("total_frame,n", po::value<size_t>()->default_value(300), "set the frame number")
       ("density,d", po::value<double>()->default_value(1.0), "set the density")
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
-      ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
+      ("maxiter,m", po::value<size_t>()->default_value(1000), "set the maximum iteration")
       ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
-      ("ws", po::value<double>()->default_value(1e5), "set the stretch weight")
+      ("ws", po::value<double>()->default_value(1e4), "set the stretch weight")
       ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
       ("wp", po::value<double>()->default_value(1e3), "set the position weight")
@@ -102,9 +102,9 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
 
-//    APPLY_FORCE(0, 3, f);
-//    REMOVE_FORCE(40, 3);
-//    RELEASE_VERT(160, 2);
+    APPLY_FORCE(0, 3, f);
+    REMOVE_FORCE(40, 3);
+    RELEASE_VERT(160, 2);
 
     solver.advance(&nods[0]);
   }

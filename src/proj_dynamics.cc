@@ -22,19 +22,16 @@ int proj_dyn_solver::initialize(const proj_dyn_args &args) {
   cout << "[info] init the projective dynamics solver";
   args_ = args;
 
-  impebf_.resize(5);
+  impebf_.resize(6);
   impebf_[0] = make_shared<momentum_potential_imp_euler>(tris_, nods_, args_.rho, args_.h);
   impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws);
   impebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
   impebf_[3] = make_shared<gravitational_potential>(tris_, nods_, args_.rho, args_.wg);
   impebf_[4] = make_shared<ext_force_energy>(nods_, 1e0);
-
-  expebf_.resize(1);
-  expebf_[0] = make_shared<surf_bending_potential>(diams_, nods_, args_.wb);
+  impebf_[5] = make_shared<isometric_bending>(diams_, nods_, args_.wb);
 
   try {
     impE_ = make_shared<energy_t<double>>(impebf_);
-    expE_ = make_shared<energy_t<double>>(expebf_);
   } catch ( exception &e ) {
     cerr << "[exception] " << e.what() << endl;
     exit(EXIT_FAILURE);
@@ -62,15 +59,6 @@ int proj_dyn_solver::remove_force(const size_t id) {
 int proj_dyn_solver::precompute() {
   cout << "[info] solver is doing precomputation";
   ASSERT(dim_ == impE_->Nx());
-  const SparseMatrix<double> &M = dynamic_pointer_cast<momentum_potential>(impebf_[0])
-      ->MassMatrix();
-  SparseMatrix<double> Id(dim_, dim_);
-  Id.setIdentity();
-  solver_.compute(M);
-  ASSERT(solver_.info() == Success);
-  Minv_ = solver_.solve(Id);
-  ASSERT(solver_.info() == Success);
-
   vector<Triplet<double>> trips;
   impE_->Hes(nullptr, &trips);
   LHS_.resize(dim_, dim_);
@@ -84,22 +72,17 @@ int proj_dyn_solver::precompute() {
 
 int proj_dyn_solver::advance(double *x) const {
   Map<VectorXd> X(x, dim_);
-  VectorXd fexp = VectorXd::Zero(dim_); {
-    expE_->Gra(x, &fexp[0]);
-    fexp *= -1;
-  }
-  const VectorXd &vel = dynamic_pointer_cast<momentum_potential>(impebf_[0])->CurrVelocity();
-  VectorXd xstar = X;//+args_.h*vel+args_.h*args_.h*Minv_*fexp;
-
+  VectorXd xstar = X;
+  // iterate solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
       double value = 0;
       impE_->Val(&xstar[0], &value);
       cout << "\t@energy value: " << value << endl;
     }
-    // local solve
+    // local step for constraint projection
     dynamic_pointer_cast<fast_mass_spring>(impebf_[1])->LocalSolve(&xstar[0]);
-    // global solve
+    // global step for compatible position
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
     }

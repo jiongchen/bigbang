@@ -12,17 +12,14 @@ using namespace Eigen;
 
 namespace bigbang {
 
-cloth_solver::cloth_solver(const mati_t &tris, const matd_t &nods)
+inext_cloth_solver::inext_cloth_solver(const mati_t &tris, const matd_t &nods)
   : dim_(nods.size()), tris_(tris), nods_(nods) {
   get_edge_elem(tris_, edges_);
   get_diam_elem(tris_, diams_);
 }
 
-int cloth_solver::initialize(const cloth_args &args) {
+int inext_cloth_solver::initialize(const inext_cloth_args &args) {
   args_ = args;
-  calc_mass_matrix(tris_, nods_, args_.density, 3, &M_, false);
-  vel_.setZero(dim_);
-  fext_.setZero(dim_);
 
   ebf_.resize(3);
   ebf_[0] = make_shared<surf_bending_potential>(diams_, nods_, args_.wb);
@@ -43,23 +40,23 @@ int cloth_solver::initialize(const cloth_args &args) {
   return 0;
 }
 
-void cloth_solver::pin_down_vert(const size_t id, const double *pos) {
+void inext_cloth_solver::pin_down_vert(const size_t id, const double *pos) {
   dynamic_pointer_cast<position_constraint>(cbf_[0])->Pin(id, pos);
 }
 
-void cloth_solver::release_vert(const size_t id) {
+void inext_cloth_solver::release_vert(const size_t id) {
   dynamic_pointer_cast<position_constraint>(cbf_[0])->Release(id);
 }
 
-void cloth_solver::apply_force(const size_t id, const double *f) {
+void inext_cloth_solver::apply_force(const size_t id, const double *f) {
   dynamic_pointer_cast<ext_force_energy>(ebf_[2])->ApplyForce(id, f);
 }
 
-void cloth_solver::remove_force(const size_t id) {
+void inext_cloth_solver::remove_force(const size_t id) {
   dynamic_pointer_cast<ext_force_energy>(ebf_[2])->RemoveForce(id);
 }
 
-int cloth_solver::advance(double *x, const size_t dim) const {
+int inext_cloth_solver::advance(double *x) const {
   // explicit integrate the system
   // project the constraint
   return 0;

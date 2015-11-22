@@ -235,7 +235,10 @@ public:
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
 private:
+  const size_t dim_;
   const mati_t &diams_;
+  double w_;
+  matd_t cotv_, area_;
 };
 
 /// !@todo check

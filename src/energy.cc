@@ -4,6 +4,7 @@
 #include <hjlib/math/blas_lapack.h>
 #include <zjucad/matrix/lapack.h>
 #include <zjucad/matrix/itr_matrix.h>
+#include <zjucad/matrix/io.h>
 #include <unsupported/Eigen/KroneckerProduct>
 
 #include "mass_matrix.h"
@@ -667,23 +668,62 @@ int surf_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
 }
 //==============================================================================
 isometric_bending::isometric_bending(const mati_t &diams, const matd_t &nods, const double w)
-  {
-
+  : diams_(diams), w_(w), dim_(nods.size()) {
+  area_.resize(diams_.size(2), 1);
+  cotv_.resize(4, diams_.size(2));
+#pragma omp parallel for
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t vert = nods(colon(), diams_(colon(), i));
+    area_[i] = calc_tri_area(vert(colon(), colon(0, 2)))+calc_tri_area(vert(colon(), colon(1, 3)));
+    double v012 = cal_cot_val(&vert(0, 0), &vert(0, 1), &vert(0, 2));
+    double v021 = cal_cot_val(&vert(0, 0), &vert(0, 2), &vert(0, 1));
+    double v312 = cal_cot_val(&vert(0, 3), &vert(0, 1), &vert(0, 2));
+    double v321 = cal_cot_val(&vert(0, 3), &vert(0, 2), &vert(0, 1));
+    cotv_(0, i) = -v012-v021;
+    cotv_(1, i) = v021+v321;
+    cotv_(2, i) = v012+v312;
+    cotv_(3, i) = -v312-v321;
+  }
 }
 
 size_t isometric_bending::Nx() const {
+  return dim_;
 }
 
 int isometric_bending::Val(const double *x, double *val) const {
-
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t vert = X(colon(), diams_(colon(), i));
+    matd_t lx = vert*cotv_(colon(), i);
+    *val += 0.5*w_*3/area_[i]*dot(lx, lx);
+  }
+  return 0;
 }
 
 int isometric_bending::Gra(const double *x, double *gra) const {
-
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t vert = X(colon(), diams_(colon(), i));
+    matd_t lx = vert*cotv_(colon(), i);
+    G(colon(), diams_(colon(), i)) += w_*3/area_[i]*(lx*trans(cotv_(colon(), i)));
+  }
+  return 0;
 }
 
 int isometric_bending::Hes(const double *x, vector<Triplet<double>> *hes) const {
-
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  for (size_t i = 0; i < diams_.size(2); ++i) {
+    matd_t H = w_*3/area_[i]*cotv_(colon(), i)*temp(trans(cotv_(colon(), i)));
+    for (size_t p = 0; p < 4; ++p) {
+      for (size_t q = 0; q < 4; ++q) {
+        add_diag_block<double, 3>(diams_(p, i), diams_(q, i), H(p, q), hes);
+      }
+    }
+  }
+  return 0;
 }
 //==============================================================================
 ext_force_energy::ext_force_energy(const matd_t &nods, const double w)
