@@ -12,15 +12,19 @@ class Functional;
 template <typename T>
 class Constraint;
 
+template <typename T>
+class constraint_piece;
+
 using mati_t=zjucad::matrix::matrix<size_t>;
 using matd_t=zjucad::matrix::matrix<double>;
 using pfunc_t=std::shared_ptr<Functional<double>>;
 using pcons_t=std::shared_ptr<Constraint<double>>;
 
 struct inext_cloth_args {
-  double density;
-  double timestep;
-  double ws, wb, wg;
+  double rho, h;
+  size_t maxiter;
+  double eps;
+  double wb, wg;
 };
 
 class inext_cloth_solver
@@ -32,18 +36,24 @@ public:
   void release_vert(const size_t id);
   void apply_force(const size_t id, const double *f);
   void remove_force(const size_t id);
-  int advance(double *x) const;
+  int assemble_constraints();
+  int advance(double *x);
 private:
+  int fast_project(double *x);
   const size_t dim_;
   const mati_t &tris_;
   const matd_t &nods_;
-  inext_cloth_args args_;
   mati_t edges_, diams_;
+
+  inext_cloth_args args_;
+  Eigen::SparseMatrix<double> M_, Minv_;
+  Eigen::VectorXd vel_;
 
   std::vector<pfunc_t> ebf_;
   pfunc_t energy_;
-  std::vector<pcons_t> cbf_;
+  std::vector<std::shared_ptr<constraint_piece<double>>> cbf_;
   pcons_t constraint_;
+  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
 };
 
 }
