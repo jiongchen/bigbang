@@ -22,16 +22,16 @@ struct argument {
   inext_cloth_args proj_args;
 };
 
-#define APPLY_FORCE(frame, id, f)  \
-  if ( i == frame )                \
+#define APPLY_FORCE(frame, id, f)    \
+  if ( i == frame )                  \
     solver.apply_force(id, f);
 
-#define REMOVE_FORCE(frame, id)    \
-  if ( i == frame )                \
+#define REMOVE_FORCE(frame, id)      \
+  if ( i == frame )                  \
     solver.remove_force(id);
 
-#define RELEASE_VERT(frame, id)    \
-  if ( i == frame )                \
+#define RELEASE_VERT(frame, id)      \
+  if ( i == frame )                  \
     solver.release_vert(id);
 
 int main(int argc, char *argv[])
@@ -45,10 +45,11 @@ int main(int argc, char *argv[])
       ("total_frame,n", po::value<size_t>()->default_value(300), "set the frame number")
       ("density,d", po::value<double>()->default_value(1.0), "set the density")
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
-      ("maxiter,m", po::value<size_t>()->default_value(1000), "set the maximum iteration")
-      ("tolerance,e", po::value<double>()->default_value(1e-7), "set the tolerance")
+      ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
+      ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
       ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
+      ("wp", po::value<double>()->default_value(1e3), "set the position weight")
       ;
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -68,6 +69,7 @@ int main(int argc, char *argv[])
     args.proj_args.eps = vm["tolerance"].as<double>();
     args.proj_args.wb = vm["wb"].as<double>();
     args.proj_args.wg = vm["wg"].as<double>();
+    args.proj_args.wp = vm["wp"].as<double>();
   }
 
   if ( !boost::filesystem::exists(args.output_folder) )
@@ -88,7 +90,7 @@ int main(int argc, char *argv[])
     solver.pin_down_vert(elem, &nods(0, elem));
 
   // precompute
-  solver.assemble_constraints();
+  solver.precompute();
 
   char outfile[256];
   double f[3] = {-200, 0, -200};

@@ -22,16 +22,16 @@ struct argument {
   proj_dyn_args proj_args;
 };
 
-#define APPLY_FORCE(frame, id, f)                                     \
-  if ( i == frame )                                                   \
+#define APPLY_FORCE(frame, id, f)    \
+  if ( i == frame )                  \
     solver.apply_force(id, f);
 
-#define REMOVE_FORCE(frame, id)                                       \
-  if ( i == frame )                                                   \
+#define REMOVE_FORCE(frame, id)      \
+  if ( i == frame )                  \
     solver.remove_force(id);
 
-#define RELEASE_VERT(frame, id)                                       \
-  if ( i == frame )                                                   \
+#define RELEASE_VERT(frame, id)      \
+  if ( i == frame )                  \
     solver.release_vert(id);
 
 int main(int argc, char *argv[])
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
       ("total_frame,n", po::value<size_t>()->default_value(300), "set the frame number")
       ("density,d", po::value<double>()->default_value(1.0), "set the density")
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
-      ("maxiter,m", po::value<size_t>()->default_value(1000), "set the maximum iteration")
+      ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
       ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
       ("ws", po::value<double>()->default_value(1e4), "set the stretch weight")
       ("wb", po::value<double>()->default_value(1e0), "set the bending weight")

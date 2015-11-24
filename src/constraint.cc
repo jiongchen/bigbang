@@ -68,7 +68,7 @@ asm_constraint::asm_constraint(const vector<shared_ptr<constraint_piece<double>>
 }
 
 int asm_constraint::Val(const double *x, double *val) const {
-//#pragma omp parallel for
+#pragma omp parallel for
   for (size_t i = 0; i < buffer_.size(); ++i) {
     buffer_[i]->eval_val(x, val+i);
   }

@@ -21,7 +21,7 @@ private:
   matd_t pos_;
 };
 
-/// $l_{curr}-l_{rest}=0$, nonlinear constraint
+/// $(l_{curr}-l_{rest})^2/d-d=0$, nonlinear constraint
 class inext_constraint : public constraint_piece<double>
 {
 public:

@@ -24,7 +24,7 @@ struct inext_cloth_args {
   double rho, h;
   size_t maxiter;
   double eps;
-  double wb, wg;
+  double wb, wg, wp;
 };
 
 class inext_cloth_solver
@@ -36,10 +36,14 @@ public:
   void release_vert(const size_t id);
   void apply_force(const size_t id, const double *f);
   void remove_force(const size_t id);
-  int assemble_constraints();
+  int precompute();
   int advance(double *x);
 private:
   int fast_project(double *x);
+  int gs_solve(double *x);
+  int red_black_gs_solve(double *x);
+  int symplectic_integrate(double *x);
+
   const size_t dim_;
   const mati_t &tris_;
   const matd_t &nods_;
@@ -53,7 +57,6 @@ private:
   pfunc_t energy_;
   std::vector<std::shared_ptr<constraint_piece<double>>> cbf_;
   pcons_t constraint_;
-  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
 };
 
 }
