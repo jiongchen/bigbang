@@ -22,9 +22,15 @@ using pcons_t=std::shared_ptr<Constraint<double>>;
 
 struct inext_cloth_args {
   double rho, h;
+  int option; // 0: fast proj 1: gauss-seidel
   size_t maxiter;
   double eps;
   double wb, wg, wp;
+};
+
+struct para_unit {
+  int tag;
+  std::shared_ptr<std::vector<std::shared_ptr<constraint_piece<double>>>> cluster;
 };
 
 class inext_cloth_solver
@@ -40,7 +46,7 @@ public:
   int advance(double *x);
 private:
   int fast_project(double *x);
-  int gs_solve(double *x);
+  int gs_solve(double *x, const std::vector<std::shared_ptr<constraint_piece<double>>> &bf);
   int red_black_gs_solve(double *x);
   int symplectic_integrate(double *x);
 

@@ -8,7 +8,7 @@ namespace bigbang {
 using mati_t=zjucad::matrix::matrix<size_t>;
 using matd_t=zjucad::matrix::matrix<double>;
 
-//// $(x-p)^2=0$, nonlinear constraint
+/// $(x-p)^2=0$, nonlinear constraint
 class position_constraint : public constraint_piece<double>
 {
 public:

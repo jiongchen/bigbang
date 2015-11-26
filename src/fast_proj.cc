@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <Eigen/UmfPackSupport>
+#include <Eigen/SparseQR>
 
 #include "constraint.h"
 #include "geom_util.h"
@@ -16,8 +17,7 @@ using namespace Eigen;
 
 namespace bigbang {
 
-static SparseMatrix<double> LHS;
-static SimplicialCholesky<SparseMatrix<double>> solver;
+static SimplicialCholesky<SparseMatrix<double>> LLTsolverA, LLTsolverB;
 
 inext_cloth_solver::inext_cloth_solver(const mati_t &tris, const matd_t &nods)
   : dim_(nods.size()), tris_(tris), nods_(nods) {
@@ -31,12 +31,13 @@ int inext_cloth_solver::initialize(const inext_cloth_args &args) {
   // calc mass matrix and its inverse
   vel_ = VectorXd::Zero(dim_);
   calc_mass_matrix(tris_, nods_, args_.rho, 3, &M_, true); {
-    SparseMatrix<double> Id(dim_, dim_);
-    Id.setIdentity();
-    solver.compute(M_);
-    ASSERT(solver.info() == Success);
-    Minv_ = solver.solve(Id);
-    ASSERT(solver.info() == Success);
+    vector<Triplet<double>> trips(M_.cols());
+#pragma omp parallel for
+    for (size_t i = 0; i < M_.cols(); ++i)
+      trips[i] = Triplet<double>(i, i, 1.0/M_.coeff(i, i));
+    Minv_.resize(M_.cols(), M_.cols());
+    Minv_.reserve(trips.size());
+    Minv_.setFromTriplets(trips.begin(), trips.end());
   }
 
   // add inextensible constraints
@@ -78,19 +79,16 @@ int inext_cloth_solver::precompute() {
   // assemble constraints
   constraint_ = make_shared<asm_constraint>(cbf_);
 
-  cout << "here\n";
   // prefactorize
-  LHS.resize(dim_, dim_); {
+  SparseMatrix<double> LHS(dim_, dim_); {
     vector<Triplet<double>> trips;
-    cout << "fuck\n";
     energy_->Hes(nullptr, &trips);
-    cout << "fuck1\n";
     LHS.reserve(trips.size());
     LHS.setFromTriplets(trips.begin(), trips.end());
     LHS = M_+args_.h*args_.h*LHS;
   }
-  solver.compute(LHS);
-  ASSERT(solver.info() == Success);
+  LLTsolverA.compute(LHS);
+  ASSERT(LLTsolverA.info() == Success);
   return 0;
 }
 
@@ -102,11 +100,12 @@ int inext_cloth_solver::advance(double *x) {
     energy_->Gra(&xstar[0], &fi[0]);
   }
   VectorXd rhs = args_.h*M_*vel_-args_.h*args_.h*fi;
-  VectorXd dx = solver.solve(rhs);
-  xstar += dx;
+  xstar += LLTsolverA.solve(rhs);
+  ASSERT(LLTsolverA.info() == Success);
 
   // project the constraint
-  fast_project(&xstar[0]);
+//    fast_project(&xstar[0]);
+  gs_solve(&xstar[0], cbf_);
 
   vel_ = (xstar-X)/args_.h;
   X = xstar;
@@ -122,13 +121,13 @@ int inext_cloth_solver::symplectic_integrate(double *x) {
 }
 
 int inext_cloth_solver::fast_project(double *x) {
-  UmfPackLU<SparseMatrix<double>> lu_solver;
+//  UmfPackLU<SparseMatrix<double>> lu_solver;
   Map<VectorXd> Xstar(x, dim_);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     VectorXd cv(constraint_->Nf()); {
       cv.setZero();
       constraint_->Val(&Xstar[0], &cv[0]);
-      if ( iter % 10 == 0 )
+      if ( iter % 1 == 0 )
         cout << "\t@max entry: " << cv.lpNorm<Infinity>() << endl;
     }
     if ( cv.lpNorm<Infinity>() < args_.eps ) {
@@ -140,47 +139,77 @@ int inext_cloth_solver::fast_project(double *x) {
       constraint_->Jac(&Xstar[0], 0, &trips);
       J.reserve(trips.size());
       J.setFromTriplets(trips.begin(), trips.end());
+      SparseQR<SparseMatrix<double>, COLAMDOrdering<int>> qr;
+      qr.compute(J);
+      cout << "J: " << J.rows() << " " << J.cols() << " rank: " << qr.rank() << endl;
     }
     SparseMatrix<double> lhs = args_.h*args_.h*J*Minv_*J.transpose();
-    lu_solver.compute(lhs);
-    ASSERT(lu_solver.info() == Success);
-    VectorXd dl = lu_solver.solve(cv);
-    ASSERT(lu_solver.info() == Success);
+    SparseQR<SparseMatrix<double>, COLAMDOrdering<int>> qr;
+    qr.compute(lhs);
+    cout << "LHS: " << qr.rows() << " " << qr.cols() << " rank: " << qr.rank() << endl;
+
+//    lu_solver.compute(lhs);
+//    ASSERT(lu_solver.info() == Success);
+//    VectorXd dl = lu_solver.solve(cv);
+//    ASSERT(lu_solver.info() == Success);
+    LLTsolverB.compute(lhs);
+    ASSERT(LLTsolverB.info() == Success);
+    VectorXd dl = LLTsolverB.solve(cv);
+    ASSERT(LLTsolverB.info() == Success);
+
     Xstar += -args_.h*args_.h*Minv_*J.transpose()*dl;
   }
   return 0;
 }
 
-int inext_cloth_solver::gs_solve(double *x) {
-//  for (size_t iter = 0; iter < MAX_ITER; ++iter) {
-//    double cons_sqr = query_constraint_squared_norm(Xstar.data());
-//    if ( i % 100 == 0 )
-//      cout << "\t@constraint norm: " << cons_sqr << endl;
-//    if ( cons_sqr < 1e-8 ) {
-//      cout << "\t@converged\n";
-//      break;
-//    }
-//    for (auto &co : buff_) {
-//      double val = 0.0;
-//      co->eval_val(x.data(), &val);
-//      if ( val == 0.0 )
-//        continue;
-//      if ( co->type_ == constraint_piece<double>::EQUAL
-//           || (co->type_ == constraint_piece<double>::GREATER && val < 0.0) ) {
-//        matd_t jac = zeros<double>(3, co->pn_.size());
-//        co->eval_jac(&X[0], &jac[0]);
-//        double s = 0;
-//        for (size_t i = 0; i < co->pn_.size(); ++i)
-//          s += Minv_[3*co->pn_[i]]*dot(jac(colon(), i), jac(colon(), i));
-//        if ( s == 0.0 )
-//          continue;
-//        s = val/s;
-//        for (size_t i = 0; i < co->pn_.size(); ++i)
-//          X(colon(), co->pn_[i]) += -s*Minv_[3*co->pn_[i]]*jac(colon(), i);
-//      }
-//    }
+int inext_cloth_solver::gs_solve(double *x, const vector<shared_ptr<constraint_piece<double>>> &bf) {
+  itr_matrix<double *> X(3, dim_/3, x);
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    VectorXd cv(constraint_->Nf()); {
+      cv.setZero();
+      constraint_->Val(&X[0], &cv[0]);
+      if ( iter % 100 == 0 )
+        cout << "\t@max entry: " << cv.lpNorm<Infinity>() << endl;
+    }
+    if ( cv.lpNorm<Infinity>() < args_.eps ) {
+      cout << "\t@converged after " << iter << " iteration\n";
+      break;
+    }
+    for (auto &pc : bf) {
+      double value = 0;
+      pc->eval_val(&X[0], &value);
+      if ( value == 0.0 )
+        continue;
+      matd_t grad = zeros<double>(3, pc->pn_.size());
+      pc->eval_jac(&X[0], &grad[0]);
+      double fnorm = 0;
+      for (size_t j = 0; j < pc->pn_.size(); ++j) { // calc $\|M^{-1}\nabla C(x)\|_F^2$
+        size_t idx = 3*pc->pn_[j];
+        fnorm += Minv_.coeff(idx, idx)*dot(grad(colon(), j), grad(colon(), j));
+      }
+      for (size_t j = 0; j < pc->pn_.size(); ++j) {
+        size_t idx = 3*pc->pn_[j];
+        X(colon(), pc->pn_[j]) += -value/fnorm*Minv_.coeff(idx, idx)*grad(colon(), j);
+      }
+    }
+  }
+  return 0;
+}
+
+int inext_cloth_solver::red_black_gs_solve(double *x) {
+//  gs_solve(red);
+//#pragma omp parallel for
+//  for () {
+//    if ( tag != red )
+//      continue;
+//    apply() {
+//        for() {
+//          one gs
+//        }
 //  }
-//  return 0;
+
+//  gs_solve(black);
+  return 0;
 }
 
 }

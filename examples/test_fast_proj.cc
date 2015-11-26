@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
       ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
+      ("proj", po::value<int>(), "set the projection methods: 0 fast proj; 1 gauss-seidel")
       ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
       ("wp", po::value<double>()->default_value(1e3), "set the position weight")
@@ -65,6 +66,7 @@ int main(int argc, char *argv[])
     args.total_frame = vm["total_frame"].as<size_t>();
     args.proj_args.rho = vm["density"].as<double>();
     args.proj_args.h = vm["timestep"].as<double>();
+    args.proj_args.option = vm["proj"].as<int>();
     args.proj_args.maxiter = vm["maxiter"].as<size_t>();
     args.proj_args.eps = vm["tolerance"].as<double>();
     args.proj_args.wb = vm["wb"].as<double>();
