@@ -22,7 +22,7 @@ using pcons=std::shared_ptr<Constraint<double>>;
 
 int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &args);
 
-int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args *args);
+int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args &args);
 
 int constrained_newton_solve(double *x, const size_t dim, const pfunc &f, const pcons &c);
 

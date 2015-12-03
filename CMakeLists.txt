@@ -45,4 +45,5 @@ find_package(Arpack REQUIRED)
 
 add_subdirectory(src)
 add_subdirectory(examples)
+add_subdirectory(tmp)
 

@@ -98,7 +98,7 @@ static int progress(void *instance,
   return 0;
 }
 
-int lbfgs_solve(double *x, const size_t dim, pfunc &f, const opt_args *args) {
+int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args &args) {
   if ( dim != f->Nx() ) {
     cerr << "[error] dim not match\n";
     return __LINE__;
