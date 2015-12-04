@@ -171,13 +171,14 @@ public:
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
   void LocalSolve(const double *x);
-  size_t auxDim() const { return 3*edge_.size(2); }
-  void getD() const;
-  void getA() const;
+  size_t aux_dim() const { return 3*edge_.size(2); }
+  const double* get_aux_var() { return d_.begin(); }
+  const Eigen::SparseMatrix<double>& get_diff_mat() const { return S_; }
 private:
   const size_t dim_;
   double w_;
   const mati_t &edge_;
+  Eigen::SparseMatrix<double> S_;
   matd_t len_;
   matd_t d_;
 };

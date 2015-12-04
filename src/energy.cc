@@ -556,6 +556,14 @@ fast_mass_spring::fast_mass_spring(const mati_t &edge, const matd_t &nods, const
     d_(colon(), i) = nods(colon(), edge_(0, i))-nods(colon(), edge_(1, i));
     len_[i] = norm(d_(colon(), i));
   }
+  S_.resize(aux_dim(), Nx()); {
+    vector<triplet<double>> trips;
+    for (size_t i = 0; i < edge_.size(2); ++i) {
+      trips.push_back(Triplet<double>(3*i+0, 3*edge_(0, i)+0, 1.0));
+      trips.push_back(Triplet<double>(3*i+0, 3*edge_(1, i)+0, -1.0));
+      trips.push_back(Triplet<double>(3*i+1, 3*edge_(0, i)+1, 1.0));
+    }
+  }
 }
 
 size_t fast_mass_spring::Nx() const {
