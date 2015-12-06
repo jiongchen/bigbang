@@ -98,7 +98,9 @@ int main(int argc, char *argv[])
   double f[3] = {-200, 0, -200};
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
-    sprintf(outfile, "%s/frame_%zu.vtk", args.output_folder.c_str(), i);
+    sprintf(outfile, "%s/frame_ws%.1e_wb%.1e_wg%.1e_wp%.1e_m%zu_%zu.vtk",
+            args.output_folder.c_str(), args.proj_args.ws, args.proj_args.wb,
+            args.proj_args.wg, args.proj_args.wp, args.proj_args.maxiter, i);
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
 
@@ -106,7 +108,7 @@ int main(int argc, char *argv[])
     REMOVE_FORCE(40, 3);
     RELEASE_VERT(160, 2);
 
-    solver.advance(&nods[0]);
+    solver.advance_beta(&nods[0]);
   }
 
   cout << "[info] all done\n";

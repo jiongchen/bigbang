@@ -557,12 +557,17 @@ fast_mass_spring::fast_mass_spring(const mati_t &edge, const matd_t &nods, const
     len_[i] = norm(d_(colon(), i));
   }
   S_.resize(aux_dim(), Nx()); {
-    vector<triplet<double>> trips;
+    vector<Triplet<double>> trips;
     for (size_t i = 0; i < edge_.size(2); ++i) {
       trips.push_back(Triplet<double>(3*i+0, 3*edge_(0, i)+0, 1.0));
       trips.push_back(Triplet<double>(3*i+0, 3*edge_(1, i)+0, -1.0));
       trips.push_back(Triplet<double>(3*i+1, 3*edge_(0, i)+1, 1.0));
+      trips.push_back(Triplet<double>(3*i+1, 3*edge_(1, i)+1, -1.0));
+      trips.push_back(Triplet<double>(3*i+2, 3*edge_(0, i)+2, 1.0));
+      trips.push_back(Triplet<double>(3*i+2, 3*edge_(1, i)+2, -1.0));
     }
+    S_.reserve(trips.size());
+    S_.setFromTriplets(trips.begin(), trips.end());
   }
 }
 

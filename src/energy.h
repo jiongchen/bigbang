@@ -173,7 +173,7 @@ public:
   void LocalSolve(const double *x);
   size_t aux_dim() const { return 3*edge_.size(2); }
   const double* get_aux_var() { return d_.begin(); }
-  const Eigen::SparseMatrix<double>& get_diff_mat() const { return S_; }
+  const Eigen::SparseMatrix<double>& get_df_mat() const { return S_; }
 private:
   const size_t dim_;
   double w_;

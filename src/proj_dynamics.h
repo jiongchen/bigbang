@@ -34,6 +34,7 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
+  int advance_beta(double *x) const;
 private:
   const mati_t &tris_;
   const matd_t &nods_;

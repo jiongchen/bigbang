@@ -90,11 +90,67 @@ int proj_dyn_solver::advance(double *x) const {
     double xstar_norm = xstar.norm();
     xstar += dx;
     if ( dx.norm() <= args_.eps*xstar_norm ) {
-      cerr << "[info] converged after " << iter+1 << " iterations\n";
+      cout << "[info] converged after " << iter+1 << " iterations\n";
       break;
     }
   }
   // update configuration
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+int proj_dyn_solver::advance_beta(double *x) const {
+  Map<VectorXd> X(x, dim_);
+  auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  const size_t fdim = fms->aux_dim();
+
+  VectorXd xstar = X, jac(dim_), eta(dim_);
+  VectorXd z(fdim), n(fdim);
+  Map<const VectorXd> Pz(fms->get_aux_var(), fdim);
+  double d0 = 0;
+  const SparseMatrix<double>& S = fms->get_df_mat();
+
+  // iterative solve
+  VectorXd unkown(dim_+1), inve(dim_), invb(dim_);
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 100 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    z = S*xstar;
+    fms->LocalSolve(&xstar[0]);
+    n = Pz-z;
+    if ( iter % 100 == 0 ) {
+      cout << "\t@iter " << iter << " normal: " << n.norm() << endl << endl;
+    }
+    jac.setZero(); {
+      impE_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    eta = S.transpose()*n;
+    d0 = n.dot(Pz-z);
+
+    invb = solver_.solve(jac);
+    ASSERT(solver_.info() == Success);
+    inve = solver_.solve(eta);
+    ASSERT(solver_.info() == Success);
+
+    if ( n.norm() < args_.eps ) {
+      cout << "here\n";
+      unkown.head(dim_) = invb;
+    } else {
+      unkown[unkown.size()-1] = (-d0+eta.dot(invb))/eta.dot(inve);
+      unkown.head(dim_) = invb-unkown[unkown.size()-1]*inve;
+    }
+    double xstar_norm = xstar.norm();
+    xstar += unkown.head(dim_);
+    if ( unkown.head(dim_).norm() <= args_.eps*xstar_norm ) {
+      cout << "[info] converged after " << iter+1 << " iterations\n";
+      break;
+    }
+  }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;
   return 0;
