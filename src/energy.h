@@ -183,6 +183,24 @@ private:
   matd_t d_;
 };
 
+class second_fms_energy : public Functional<double>
+{
+public:
+  second_fms_energy(const mati_t &edge, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void LocalSolve(const double *x);
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &edge_;
+  Eigen::SparseMatrix<double> S_, J_;
+  matd_t len_;
+  matd_t d_;
+};
+
 class line_bending_potential : public Functional<double>
 {
 public:

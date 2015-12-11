@@ -35,6 +35,7 @@ public:
   int precompute();
   int advance(double *x) const;
   int advance_beta(double *x) const;
+  int advance_gamma(double *x) const;
 private:
   const mati_t &tris_;
   const matd_t &nods_;

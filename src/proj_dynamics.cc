@@ -73,15 +73,19 @@ int proj_dyn_solver::precompute() {
 int proj_dyn_solver::advance(double *x) const {
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
+  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  VectorXd prev_step, next_step;
+  const static SparseMatrix<double>& S = fms->get_df_mat();
   // iterate solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 10 == 0 ) {
+    if ( iter % 100 == 0 ) {
       double value = 0;
       impE_->Val(&xstar[0], &value);
       cout << "\t@energy value: " << value << endl;
     }
     // local step for constraint projection
-    dynamic_pointer_cast<fast_mass_spring>(impebf_[1])->LocalSolve(&xstar[0]);
+    fms->LocalSolve(&xstar[0]);
+    prev_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
     // global step for compatible position
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
@@ -89,6 +93,13 @@ int proj_dyn_solver::advance(double *x) const {
     VectorXd dx = -solver_.solve(jac);
     double xstar_norm = xstar.norm();
     xstar += dx;
+    next_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
+    if ( iter < 5 ) {
+      cout << "\t@prev step size: " << prev_step.norm() << endl;
+      cout << "\t@post step size: " << next_step.norm() << endl;
+      cout << "\t@dx norm: " << dx.norm() << endl;
+      cout << "\t@turning angle: " << acos(prev_step.dot(next_step)/(prev_step.norm()*next_step.norm()))/M_PI*180 << endl << endl;
+    }
     if ( dx.norm() <= args_.eps*xstar_norm ) {
       cout << "[info] converged after " << iter+1 << " iterations\n";
       break;
@@ -110,6 +121,7 @@ int proj_dyn_solver::advance_beta(double *x) const {
   Map<const VectorXd> Pz(fms->get_aux_var(), fdim);
   double d0 = 0;
   const SparseMatrix<double>& S = fms->get_df_mat();
+  VectorXd next_step(fdim);
 
   // iterative solve
   VectorXd unkown(dim_+1), inve(dim_), invb(dim_);
@@ -119,12 +131,14 @@ int proj_dyn_solver::advance_beta(double *x) const {
       impE_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
+    // local solve
     z = S*xstar;
     fms->LocalSolve(&xstar[0]);
-    n = Pz-z;
+    n = z-Pz;
     if ( iter % 100 == 0 ) {
       cout << "\t@iter " << iter << " normal: " << n.norm() << endl << endl;
     }
+    // global solve
     jac.setZero(); {
       impE_->Gra(&xstar[0], &jac[0]);
       jac *= -1;
@@ -138,7 +152,6 @@ int proj_dyn_solver::advance_beta(double *x) const {
     ASSERT(solver_.info() == Success);
 
     if ( n.norm() < args_.eps ) {
-      cout << "here\n";
       unkown.head(dim_) = invb;
     } else {
       unkown[unkown.size()-1] = (-d0+eta.dot(invb))/eta.dot(inve);
@@ -146,6 +159,13 @@ int proj_dyn_solver::advance_beta(double *x) const {
     }
     double xstar_norm = xstar.norm();
     xstar += unkown.head(dim_);
+    next_step = S*xstar-Pz;
+    if ( iter < 5 ) {
+      cout << "\t@prev step size: " << n.norm() << endl;
+      cout << "\t@post step size: " << next_step.norm() << endl;
+      cout << "\t@dx norm: " << unkown.head(dim_).norm() << endl;
+      cout << "\t@turning angle: " << acos(n.dot(next_step)/(n.norm()*next_step.norm()))/M_PI*180 << "\n\n";
+    }
     if ( unkown.head(dim_).norm() <= args_.eps*xstar_norm ) {
       cout << "[info] converged after " << iter+1 << " iterations\n";
       break;
@@ -153,6 +173,16 @@ int proj_dyn_solver::advance_beta(double *x) const {
   }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;
+  return 0;
+}
+
+int proj_dyn_solver::advance_gamma(double *x) const {
+  Map<VectorXd> X(x, dim_);
+  VectorXd star = X;
+  // iterative solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+
+  }
   return 0;
 }
 

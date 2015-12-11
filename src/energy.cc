@@ -60,6 +60,97 @@ void line_bending_(double *val, const double *x, const double *d1, const double 
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
 void line_bending_hes_(double *hes, const double *x, const double *d1, const double *d2);
 
+typedef double scalarD;
+void const_len_spring(double *out, const double *x, const double *l0) {
+  //input
+  scalarD a1 = x[0];
+  scalarD a2 = x[1];
+  scalarD a3 = x[2];
+  scalarD b1 = x[3];
+  scalarD b2 = x[4];
+  scalarD b3 = x[5];
+  scalarD r = *l0;
+
+  //temp
+  scalarD tt1;
+  scalarD tt2;
+  scalarD tt3;
+  scalarD tt4;
+
+  tt1=a1-b1;
+  tt2=a2-b2;
+  tt3=a3-b3;
+  tt4=1/sqrt(pow(tt3,2)+pow(tt2,2)+pow(tt1,2));
+  out[0]=tt1*tt4*r;
+  out[1]=tt2*tt4*r;
+  out[2]=tt4*tt3*r;
+}
+void const_len_spring_jac(double *out, const double *x, const double *l0) {
+  //input
+  scalarD a1 = x[0];
+  scalarD a2 = x[1];
+  scalarD a3 = x[2];
+  scalarD b1 = x[3];
+  scalarD b2 = x[4];
+  scalarD b3 = x[5];
+  scalarD r = *l0;
+
+  //temp
+  scalarD tt1;
+  scalarD tt2;
+  scalarD tt3;
+  scalarD tt4;
+  scalarD tt5;
+  scalarD tt6;
+  scalarD tt7;
+  scalarD tt8;
+  scalarD tt9;
+  scalarD tt10;
+  scalarD tt11;
+  scalarD tt12;
+  scalarD tt13;
+  scalarD tt14;
+  scalarD tt15;
+  scalarD tt16;
+  scalarD tt17;
+
+  tt1=a1-b1;
+  tt2=pow(tt1,2);
+  tt3=a2-b2;
+  tt4=pow(tt3,2);
+  tt5=a3-b3;
+  tt6=pow(tt5,2);
+  tt7=sqrt(tt6+tt4+tt2);
+  tt8=1/pow(tt7,3);
+  tt9=1/tt7;
+  tt10=tt9*r;
+  tt11=-tt1*tt3*tt8*r;
+  tt12=-tt1*tt8*tt5*r;
+  tt13=-tt3*tt8*tt5*r;
+  tt14=-tt9*r;
+  tt15=tt1*tt3*tt8*r;
+  tt16=tt1*tt8*tt5*r;
+  tt17=tt3*tt8*tt5*r;
+  out[0]=tt10-tt2*tt8*r;
+  out[1]=tt11;
+  out[2]=tt12;
+  out[3]=tt11;
+  out[4]=tt10-tt4*tt8*r;
+  out[5]=tt13;
+  out[6]=tt12;
+  out[7]=tt13;
+  out[8]=tt10-tt8*tt6*r;
+  out[9]=tt14+tt2*tt8*r;
+  out[10]=tt15;
+  out[11]=tt16;
+  out[12]=tt15;
+  out[13]=tt14+tt4*tt8*r;
+  out[14]=tt17;
+  out[15]=tt16;
+  out[16]=tt17;
+  out[17]=tt8*tt6*r+tt14;
+}
+
 }
 
 void tet_corotational_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
@@ -608,6 +699,76 @@ int fast_mass_spring::Hes(const double *x, vector<Triplet<double>> *hes) const {
 }
 
 void fast_mass_spring::LocalSolve(const double *x) {
+  itr_matrix<const double *> X(3, dim_/3, x);
+#pragma omp parallel for
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    d_(colon(), i) = X(colon(), edge_(0, i))-X(colon(), edge_(1, i));
+    double dnorm = norm(d_(colon(), i));
+    d_(colon(), i) *= len_[i]/dnorm;
+  }
+}
+//==============================================================================
+second_fms_energy::second_fms_energy(const mati_t &edge, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), edge_(edge) {
+  len_.resize(edge_.size(2), 1);
+  d_.resize(3, edge_.size(2));
+#pragma omp parallel for
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    d_(colon(), i) = nods(colon(), edge_(0, i))-nods(colon(), edge_(1, i));
+    len_[i] = norm(d_(colon(), i));
+  }
+  S_.resize(3*edge_.size(2), Nx()); {
+    vector<Triplet<double>> trips;
+    for (size_t i = 0; i < edge_.size(2); ++i) {
+      trips.push_back(Triplet<double>(3*i+0, 3*edge_(0, i)+0, 1.0));
+      trips.push_back(Triplet<double>(3*i+0, 3*edge_(1, i)+0, -1.0));
+      trips.push_back(Triplet<double>(3*i+1, 3*edge_(0, i)+1, 1.0));
+      trips.push_back(Triplet<double>(3*i+1, 3*edge_(1, i)+1, -1.0));
+      trips.push_back(Triplet<double>(3*i+2, 3*edge_(0, i)+2, 1.0));
+      trips.push_back(Triplet<double>(3*i+2, 3*edge_(1, i)+2, -1.0));
+    }
+    S_.reserve(trips.size());
+    S_.setFromTriplets(trips.begin(), trips.end());
+  }
+}
+
+size_t second_fms_energy::Nx() const {
+  return dim_;
+}
+
+int second_fms_energy::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  matd_t dx(3, 1);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    dx = X(colon(), edge_(0, i))-X(colon(), edge_(1, i))-d_(colon(), i);
+    *val += 0.5*w_*dot(dx, dx);
+  }
+  return 0;
+}
+
+int second_fms_energy::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+
+  }
+  return 0;
+}
+
+int second_fms_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    add_diag_block<double, 3>(edge_(0, i), edge_(0, i), w_, hes);
+    add_diag_block<double, 3>(edge_(0, i), edge_(1, i), -w_, hes);
+    add_diag_block<double, 3>(edge_(1, i), edge_(0, i), -w_, hes);
+    add_diag_block<double, 3>(edge_(1, i), edge_(1, i), w_, hes);
+  }
+  return 0;
+}
+
+void second_fms_energy::LocalSolve(const double *x) {
   itr_matrix<const double *> X(3, dim_/3, x);
 #pragma omp parallel for
   for (size_t i = 0; i < edge_.size(2); ++i) {

@@ -1,0 +1,49 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 13.04.2 ] */
+
+/* [wxMaxima: input   start ] */
+load(cj_function);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+load(f90);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+d(x,r) := block(
+    [edge],
+    edge: col(x,1)-col(x,2),
+    r*edge/NORM(edge)
+);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+X: matrix([a1, b1], [a2, b2], [a3, b3]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+val: d(X, r);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+matrix_size(val);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+jac: GRAD(val, X);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+matrix_size(jac);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+f90(optimize(FLATTEN(val)));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+f90(optimize(FLATTEN(jac)));
+/* [wxMaxima: input   end   ] */
+
+/* Maxima can't load/batch files which end with a comment! */
+"Created with wxMaxima"$
