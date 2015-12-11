@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
       ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
-      ("proj", po::value<int>(), "set the projection methods: 0 fast proj; 1 gauss-seidel")
+      ("proj", po::value<int>(), "projection methods:0-fast proj; 1-GS; 2-color GS")
       ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
       ("wp", po::value<double>()->default_value(1e3), "set the position weight")
@@ -102,9 +102,9 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
 
-//    APPLY_FORCE(0, 3, f);
-//    REMOVE_FORCE(40, 3);
-//    RELEASE_VERT(160, 2);
+    APPLY_FORCE(0, 3, f);
+    REMOVE_FORCE(40, 3);
+    RELEASE_VERT(160, 2);
 
     solver.advance(&nods[0]);
   }

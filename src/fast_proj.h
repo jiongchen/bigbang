@@ -22,7 +22,7 @@ using pcons_t=std::shared_ptr<Constraint<double>>;
 
 struct inext_cloth_args {
   double rho, h;
-  int option; // 0: fast proj 1: gauss-seidel
+  int option; // 0-fast proj; 1-GS; 2-colored GS;
   size_t maxiter;
   double eps;
   double wb, wg, wp;
@@ -36,6 +36,11 @@ struct para_unit {
 class inext_cloth_solver
 {
 public:
+  enum Color {
+    RED,
+    YELLOW,
+    BLUE,
+  };
   inext_cloth_solver(const mati_t &tris, const matd_t &nods);
   int initialize(const inext_cloth_args &args);
   void pin_down_vert(const size_t id, const double *pos);
@@ -47,9 +52,10 @@ public:
 private:
   int fast_project(double *x);
   int gs_solve(double *x, const std::vector<std::shared_ptr<constraint_piece<double>>> &bf);
-  int red_black_gs_solve(double *x);
+  int color_gs_solve(double *x, const std::vector<para_unit> &parts);
+  int apply(double *x, Color color, const std::vector<std::shared_ptr<constraint_piece<double>>> &bf);
   int symplectic_integrate(double *x);
-
+private:
   const size_t dim_;
   const mati_t &tris_;
   const matd_t &nods_;

@@ -104,8 +104,12 @@ int inext_cloth_solver::advance(double *x) {
   ASSERT(LLTsolverA.info() == Success);
 
   // project the constraint
-//    fast_project(&xstar[0]);
-  gs_solve(&xstar[0], cbf_);
+  switch ( args_.option ) {
+    case 0: fast_project(&xstar[0]); break;
+    case 1: gs_solve(&xstar[0], cbf_); break;
+    //case 2: color_gs_solve(&xstar[0], parts); break;
+    default: break;
+  }
 
   vel_ = (xstar-X)/args_.h;
   X = xstar;
@@ -196,19 +200,21 @@ int inext_cloth_solver::gs_solve(double *x, const vector<shared_ptr<constraint_p
   return 0;
 }
 
-int inext_cloth_solver::red_black_gs_solve(double *x) {
-//  gs_solve(red);
-//#pragma omp parallel for
-//  for () {
-//    if ( tag != red )
-//      continue;
-//    apply() {
-//        for() {
-//          one gs
-//        }
-//  }
+int inext_cloth_solver::color_gs_solve(double *x, const vector<para_unit> &parts) {
+  // iteration
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+#pragma omp parallel
+    for (size_t i = 0; i < parts.size(); ++i) {
+      apply(x, RED, *parts[i].cluster);
+      apply(x, YELLOW, *parts[i].cluster);
+      apply(x, BLUE, *parts[i].cluster);
+    }
+    // convergence test
+  }
+  return 0;
+}
 
-//  gs_solve(black);
+int inext_cloth_solver::apply(double *x, Color color, const vector<shared_ptr<constraint_piece<double>>> &bf) {
   return 0;
 }
 
