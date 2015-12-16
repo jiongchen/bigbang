@@ -17,6 +17,7 @@ using namespace zjucad::matrix;
 using namespace bigbang;
 namespace po=boost::program_options;
 
+namespace test_embedded_fem {
 struct argument {
   string input_mesh;
   string input_cons;
@@ -27,6 +28,7 @@ struct argument {
   double young_modulus;
   double poisson_ratio;
 };
+}
 
 static opt_args optparam = {10000, 1e-10, false};
 
@@ -51,7 +53,7 @@ int main(int argc, char *argv[])
     cout << desc << endl;
     return 1;
   }
-  argument args = {
+  test_embedded_fem::argument args = {
     vm["input_mesh"].as<string>(),
     vm["input_cons"].as<string>(),
     vm["output_folder"].as<string>(),

@@ -18,6 +18,7 @@ using namespace bigbang;
 using namespace zjucad::matrix;
 namespace po=boost::program_options;
 
+namespace test_cloth {
 struct argument {
   string input_mesh;
   string input_cons;
@@ -27,6 +28,7 @@ struct argument {
   size_t total_frame;
   double ws, wb, wg, wp;
 };
+}
 
 static opt_args optparam = {10000, 1e-8, true};
 
@@ -65,7 +67,7 @@ int main(int argc, char *argv[])
     cout << desc << endl;
     return __LINE__;
   }
-  argument args = {
+  test_cloth::argument args = {
     vm["input_mesh"].as<string>(),
     vm["input_cons"].as<string>(),
     vm["output_folder"].as<string>(),

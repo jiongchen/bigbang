@@ -10,6 +10,7 @@
 #include <zjucad/matrix/lapack.h>
 #include <zjucad/matrix/itr_matrix.h>
 #include <zjucad/matrix/io.h>
+#include <omp.h>
 
 #include "src/mass_matrix.h"
 #include "src/config.h"
@@ -137,6 +138,14 @@ int test_hex_elastic(ptree &pt) {
   return 0;
 }
 
+int test_omp_num_threads(ptree &pt) {
+#pragma omp parallel for
+  for (size_t i = 0; i < 1; ++i) {
+    printf("this is %zu\n", i);
+  }
+  return 0;
+}
+
 int test_mat_add_scalar(ptree &pt) {
   matd_t mat = rand<double>(3, 2);
   cout << mat << endl << endl;
@@ -158,6 +167,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_energy);
     CALL_SUB_PROG(test_hex_elastic);
     CALL_SUB_PROG(test_mat_add_scalar);
+    CALL_SUB_PROG(test_omp_num_threads);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);

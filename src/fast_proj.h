@@ -29,7 +29,7 @@ struct inext_cloth_args {
 };
 
 struct para_unit {
-  int tag;
+  int color_tag;
   std::shared_ptr<std::vector<std::shared_ptr<constraint_piece<double>>>> cluster;
 };
 
@@ -40,6 +40,7 @@ public:
     RED,
     YELLOW,
     BLUE,
+    BLACK
   };
   inext_cloth_solver(const mati_t &tris, const matd_t &nods);
   int initialize(const inext_cloth_args &args);
@@ -51,9 +52,9 @@ public:
   int advance(double *x);
 private:
   int fast_project(double *x);
-  int gs_solve(double *x, const std::vector<std::shared_ptr<constraint_piece<double>>> &bf);
-  int color_gs_solve(double *x, const std::vector<para_unit> &parts);
-  int apply(double *x, Color color, const std::vector<std::shared_ptr<constraint_piece<double>>> &bf);
+  int gs_solve(double *x, const std::vector<para_unit> &partition);
+  int color_gs_solve(double *x, const std::vector<para_unit> &partition);
+  int apply(double *x, Color color, const std::vector<para_unit> &partition);
   int symplectic_integrate(double *x);
 private:
   const size_t dim_;
@@ -67,7 +68,7 @@ private:
 
   std::vector<pfunc_t> ebf_;
   pfunc_t energy_;
-  std::vector<std::shared_ptr<constraint_piece<double>>> cbf_;
+  std::vector<para_unit> cbf_;
   pcons_t constraint_;
 };
 

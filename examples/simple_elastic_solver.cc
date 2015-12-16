@@ -19,6 +19,7 @@ using mati_t=zjucad::matrix::matrix<size_t>;
 using matd_t=zjucad::matrix::matrix<double>;
 namespace po=boost::program_options;
 
+namespace test_ses {
 struct argument {
   string input_mesh;
   string input_cons;
@@ -32,6 +33,7 @@ struct argument {
   double wg;
   double wp;
 };
+}
 
 //#define IMPL_EULER
 
@@ -61,7 +63,7 @@ int main(int argc, char *argv[])
     cout << desc << endl;
     return __LINE__;
   }
-  argument args = {
+  test_ses::argument args = {
     vm["input_mesh"].as<string>(),
     vm["input_cons"].as<string>(),
     vm["output_folder"].as<string>(),

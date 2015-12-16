@@ -14,6 +14,7 @@ using namespace bigbang;
 using namespace zjucad::matrix;
 namespace po = boost::program_options;
 
+namespace test_fast_proj {
 struct argument {
   string input_mesh;
   string input_cons;
@@ -21,6 +22,7 @@ struct argument {
   size_t total_frame;
   inext_cloth_args proj_args;
 };
+}
 
 #define APPLY_FORCE(frame, id, f)    \
   if ( i == frame )                  \
@@ -59,7 +61,7 @@ int main(int argc, char *argv[])
     cout << desc << endl;
     return __LINE__;
   }
-  argument args; {
+  test_fast_proj::argument args; {
     args.input_mesh = vm["input_mesh"].as<string>();
     args.input_cons = vm["input_cons"].as<string>();
     args.output_folder = vm["output_folder"].as<string>();
