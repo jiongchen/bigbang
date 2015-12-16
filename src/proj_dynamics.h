@@ -16,6 +16,7 @@ using pfunc_t=std::shared_ptr<Functional<double>>;
 struct proj_dyn_args {
   double rho, h;
   size_t maxiter;
+  int method;
   double eps;
   double ws;  // for stretch
   double wb;  // for bending
@@ -34,8 +35,9 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
+private:
+  int advance_alpha(double *x) const;
   int advance_beta(double *x) const;
-  int advance_gamma(double *x) const;
 private:
   const mati_t &tris_;
   const matd_t &nods_;

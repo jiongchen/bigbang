@@ -13,4 +13,4 @@ elif [ ! -e "$mesh" ]; then
   exit 1
 fi
 
-time $exe -i $mesh -c $cons -o $outfolder --wb 0.000 --method 1 -m 20000 -n 2
+time $exe -i $mesh -c $cons -o $outfolder --wb 0.000 --method 0 -m 20000 -n 2

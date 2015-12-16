@@ -41,12 +41,14 @@ int inext_cloth_solver::initialize(const inext_cloth_args &args) {
     Minv_.setFromTriplets(trips.begin(), trips.end());
   }
 
-  // add inextensible constraints
+  // add groups of inextensible constraints
   if ( args_.option == 0 || args_.option == 1 ) {
     para_unit temp{BLACK, make_shared<vector<shared_ptr<constraint_piece<double>>>>()};
     for (size_t i = 0; i < edges_.size(2); ++i)
       temp.cluster->push_back(make_shared<inext_constraint>(edges_(colon(), i), nods_));
     cbf_.push_back(temp);
+  } else if ( args_.option == 2 ) {
+    /////> coloring and partitioning
   }
 
   // assemble energy
@@ -81,10 +83,6 @@ void inext_cloth_solver::remove_force(const size_t id) {
 }
 
 int inext_cloth_solver::precompute() {
-  if ( args_.option != 0 ) {
-    cout << "[info] no need for constraint assembling\n";
-    return __LINE__;
-  }
   // assemble constraints
   constraint_ = make_shared<asm_constraint>(*cbf_.begin()->cluster);
 
@@ -116,7 +114,7 @@ int inext_cloth_solver::advance(double *x) {
   switch ( args_.option ) {
     case 0: fast_project(&xstar[0]); break;
     case 1: gs_solve(&xstar[0], cbf_); break;
-    //case 2: color_gs_solve(&xstar[0], parts); break;
+    case 2: color_gs_solve(&xstar[0], cbf_); break;
     default: break;
   }
 
@@ -183,8 +181,7 @@ int inext_cloth_solver::gs_solve(double *x, const std::vector<para_unit> &partit
 
 int inext_cloth_solver::color_gs_solve(double *x, const vector<para_unit> &partition) {
   ASSERT(args_.option == 2);
-  // iteration
-  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) { // sequential
     apply(x, RED, partition);
     apply(x, YELLOW, partition);
     apply(x, BLUE, partition);

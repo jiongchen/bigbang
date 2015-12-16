@@ -196,7 +196,6 @@ private:
   const size_t dim_;
   double w_;
   const mati_t &edge_;
-  Eigen::SparseMatrix<double> S_, J_;
   matd_t len_;
   matd_t d_;
 };

@@ -24,7 +24,10 @@ int proj_dyn_solver::initialize(const proj_dyn_args &args) {
 
   impebf_.resize(6);
   impebf_[0] = make_shared<momentum_potential_imp_euler>(tris_, nods_, args_.rho, args_.h);
-  impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws);
+  if ( args_.method != 2 )
+    impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws);
+  else
+    impebf_[1] = make_shared<second_fms_energy>(edges_, nods_, args_.ws);
   impebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
   impebf_[3] = make_shared<gravitational_potential>(tris_, nods_, args_.rho, args_.wg);
   impebf_[4] = make_shared<ext_force_energy>(nods_, 1e0);
@@ -71,6 +74,13 @@ int proj_dyn_solver::precompute() {
 }
 
 int proj_dyn_solver::advance(double *x) const {
+  if ( args_.method == 0 || args_.method == 2 )
+    return advance_alpha(x);
+  else
+    return advance_beta(x);
+}
+
+int proj_dyn_solver::advance_alpha(double *x) const {
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
@@ -81,7 +91,7 @@ int proj_dyn_solver::advance(double *x) const {
     if ( iter % 100 == 0 ) {
       double value = 0;
       impE_->Val(&xstar[0], &value);
-      cout << "\t@energy value: " << value << endl;
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
     // local step for constraint projection
     fms->LocalSolve(&xstar[0]);
@@ -173,16 +183,6 @@ int proj_dyn_solver::advance_beta(double *x) const {
   }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;
-  return 0;
-}
-
-int proj_dyn_solver::advance_gamma(double *x) const {
-  Map<VectorXd> X(x, dim_);
-  VectorXd star = X;
-  // iterative solve
-  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-
-  }
   return 0;
 }
 

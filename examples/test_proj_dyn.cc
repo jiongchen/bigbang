@@ -20,7 +20,6 @@ struct argument {
   string input_cons;
   string output_folder;
   size_t total_frame;
-  int method;
   proj_dyn_args proj_args;
 };
 }
@@ -68,10 +67,10 @@ int main(int argc, char *argv[])
     args.input_cons = vm["input_cons"].as<string>();
     args.output_folder = vm["output_folder"].as<string>();
     args.total_frame = vm["total_frame"].as<size_t>();
-    args.method = vm["method"].as<int>();
     args.proj_args.rho = vm["density"].as<double>();
     args.proj_args.h = vm["timestep"].as<double>();
     args.proj_args.maxiter = vm["maxiter"].as<size_t>();
+    args.proj_args.method = vm["method"].as<int>();
     args.proj_args.eps = vm["tolerance"].as<double>();
     args.proj_args.ws = vm["ws"].as<double>();
     args.proj_args.wb = vm["wb"].as<double>();
@@ -104,7 +103,7 @@ int main(int argc, char *argv[])
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
     sprintf(outfile, "%s/frame_method%d_ws%.1e_wb%.1e_wg%.1e_wp%.1e_m%zu_%zu.vtk",
-            args.output_folder.c_str(), args.method, args.proj_args.ws, args.proj_args.wb,
+            args.output_folder.c_str(), args.proj_args.method, args.proj_args.ws, args.proj_args.wb,
             args.proj_args.wg, args.proj_args.wp, args.proj_args.maxiter, i);
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
@@ -113,11 +112,7 @@ int main(int argc, char *argv[])
     REMOVE_FORCE(40, 3);
     RELEASE_VERT(160, 2);
 
-    switch ( args.method ) {
-      case 0: solver.advance(&nods[0]); break;
-      case 1: solver.advance_beta(&nods[0]); break;
-      default: break;
-    }
+    solver.advance(&nods[0]);
   }
 
   cout << "[info] all done\n";
