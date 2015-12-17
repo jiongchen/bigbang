@@ -667,6 +667,7 @@ size_t fast_mass_spring::Nx() const {
 }
 
 int fast_mass_spring::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   matd_t dx(3, 1);
   for (size_t i = 0; i < edge_.size(2); ++i) {
@@ -677,6 +678,7 @@ int fast_mass_spring::Val(const double *x, double *val) const {
 }
 
 int fast_mass_spring::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   itr_matrix<double *> G(3, dim_/3, gra);
   matd_t dx(3, 1);
@@ -689,6 +691,7 @@ int fast_mass_spring::Gra(const double *x, double *gra) const {
 }
 
 int fast_mass_spring::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     add_diag_block<double, 3>(edge_(0, i), edge_(0, i), w_, hes);
     add_diag_block<double, 3>(edge_(0, i), edge_(1, i), -w_, hes);
@@ -708,7 +711,7 @@ void fast_mass_spring::LocalSolve(const double *x) {
   }
 }
 //==============================================================================
-second_fms_energy::second_fms_energy(const mati_t &edge, const matd_t &nods, const double w)
+modified_fms_energy::modified_fms_energy(const mati_t &edge, const matd_t &nods, const double w)
   : dim_(nods.size()), w_(w), edge_(edge) {
   len_.resize(edge_.size(2), 1);
   d_.resize(3, edge_.size(2));
@@ -717,13 +720,26 @@ second_fms_energy::second_fms_energy(const mati_t &edge, const matd_t &nods, con
     d_(colon(), i) = nods(colon(), edge_(0, i))-nods(colon(), edge_(1, i));
     len_[i] = norm(d_(colon(), i));
   }
+  S_.resize(aux_dim(), Nx()); {
+    vector<Triplet<double>> trips;
+    for (size_t i = 0; i < edge_.size(2); ++i) {
+      trips.push_back(Triplet<double>(3*i+0, 3*edge_(0, i)+0, 1.0));
+      trips.push_back(Triplet<double>(3*i+0, 3*edge_(1, i)+0, -1.0));
+      trips.push_back(Triplet<double>(3*i+1, 3*edge_(0, i)+1, 1.0));
+      trips.push_back(Triplet<double>(3*i+1, 3*edge_(1, i)+1, -1.0));
+      trips.push_back(Triplet<double>(3*i+2, 3*edge_(0, i)+2, 1.0));
+      trips.push_back(Triplet<double>(3*i+2, 3*edge_(1, i)+2, -1.0));
+    }
+    S_.reserve(trips.size());
+    S_.setFromTriplets(trips.begin(), trips.end());
+  }
 }
 
-size_t second_fms_energy::Nx() const {
+size_t modified_fms_energy::Nx() const {
   return dim_;
 }
 
-int second_fms_energy::Val(const double *x, double *val) const {
+int modified_fms_energy::Val(const double *x, double *val) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   matd_t dx(3, 1);
@@ -734,26 +750,26 @@ int second_fms_energy::Val(const double *x, double *val) const {
   return 0;
 }
 
-int second_fms_energy::Gra(const double *x, double *gra) const {
+int modified_fms_energy::Gra(const double *x, double *gra) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   itr_matrix<double *> G(3, dim_/3, gra);
   // \nabla f = 0 => (S^T-J)(Sx-d) = 0
   matd_t ST(6, 3), JT(6, 3), vert(3, 2), p(3, 1), J(3, 6), grad(6, 1);
-  ST(colon(0, 2), colon()) = identity_matrix<double>(3);
-  ST(colon(3, 5), colon()) = -identity_matrix<double>(3);
+  ST(colon(0, 2), colon()) = eye<double>(3);
+  ST(colon(3, 5), colon()) = -eye<double>(3);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     vert = X(colon(), edge_(colon(), i));
-    p = X(colon(), 0)-X(colon(), 1);
+    p = vert(colon(), 0)-vert(colon(), 1);
     const_len_spring_jac(&J[0], &vert[0], &len_[i]);
     JT = trans(J);
-//    grad = JT*;
+    grad = (ST-JT)*(p-d_(colon(), i));
     G(colon(), edge_(colon(), i)) += w_*itr_matrix<const double *>(3, 2, &grad[0]);
   }
   return 0;
 }
 
-int second_fms_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
+int modified_fms_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     add_diag_block<double, 3>(edge_(0, i), edge_(0, i), w_, hes);
@@ -764,7 +780,7 @@ int second_fms_energy::Hes(const double *x, vector<Triplet<double>> *hes) const 
   return 0;
 }
 
-void second_fms_energy::LocalSolve(const double *x) {
+void modified_fms_energy::LocalSolve(const double *x) {
   itr_matrix<const double *> X(3, dim_/3, x);
 #pragma omp parallel for
   for (size_t i = 0; i < edge_.size(2); ++i) {

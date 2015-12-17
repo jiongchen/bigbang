@@ -12,6 +12,8 @@ using namespace Eigen;
 
 namespace bigbang {
 
+static Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
+
 proj_dyn_solver::proj_dyn_solver(const mati_t &tris, const matd_t &nods)
   : tris_(tris), nods_(nods), dim_(nods.size()) {
   get_edge_elem(tris_, edges_);
@@ -24,10 +26,12 @@ int proj_dyn_solver::initialize(const proj_dyn_args &args) {
 
   impebf_.resize(6);
   impebf_[0] = make_shared<momentum_potential_imp_euler>(tris_, nods_, args_.rho, args_.h);
-  if ( args_.method != 2 )
-    impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws);
-  else
-    impebf_[1] = make_shared<second_fms_energy>(edges_, nods_, args_.ws);
+  switch ( args_.method ) {
+    case 0: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
+    case 1: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
+    case 2: impebf_[1] = make_shared<modified_fms_energy>(edges_, nods_, args_.ws); break;
+    default: break;
+  }
   impebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
   impebf_[3] = make_shared<gravitational_potential>(tris_, nods_, args_.rho, args_.wg);
   impebf_[4] = make_shared<ext_force_energy>(nods_, 1e0);
@@ -74,13 +78,18 @@ int proj_dyn_solver::precompute() {
 }
 
 int proj_dyn_solver::advance(double *x) const {
-  if ( args_.method == 0 || args_.method == 2 )
-    return advance_alpha(x);
-  else
-    return advance_beta(x);
+  int rtn = 0;
+  switch ( args_.method ) {
+    case 0: rtn = advance_alpha(x); break;
+    case 1: rtn = advance_beta(x); break;
+    case 2: rtn = advance_gamma(x); break;
+    default: return __LINE__;
+  }
+  return rtn;
 }
 
 int proj_dyn_solver::advance_alpha(double *x) const {
+  ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
@@ -122,6 +131,7 @@ int proj_dyn_solver::advance_alpha(double *x) const {
 }
 
 int proj_dyn_solver::advance_beta(double *x) const {
+  ASSERT(args_.method == 1);
   Map<VectorXd> X(x, dim_);
   auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   const size_t fdim = fms->aux_dim();
@@ -181,6 +191,48 @@ int proj_dyn_solver::advance_beta(double *x) const {
       break;
     }
   }
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+int proj_dyn_solver::advance_gamma(double *x) const {
+  ASSERT(args_.method == 2);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X;
+  const auto fms = dynamic_pointer_cast<modified_fms_energy>(impebf_[1]);
+  VectorXd prev_step, next_step;
+  const static SparseMatrix<double>& S = fms->get_df_mat();
+  // iterate solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 100 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    // local step for constraint projection
+    fms->LocalSolve(&xstar[0]);
+    prev_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
+    // global step for compatible position
+    VectorXd jac = VectorXd::Zero(dim_); {
+      impE_->Gra(&xstar[0], &jac[0]);
+    }
+    VectorXd dx = -solver_.solve(jac);
+    double xstar_norm = xstar.norm();
+    xstar += dx;
+    next_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
+    if ( iter < 5 ) {
+      cout << "\t@prev step size: " << prev_step.norm() << endl;
+      cout << "\t@post step size: " << next_step.norm() << endl;
+      cout << "\t@dx norm: " << dx.norm() << endl;
+      cout << "\t@turning angle: " << acos(prev_step.dot(next_step)/(prev_step.norm()*next_step.norm()))/M_PI*180 << endl << endl;
+    }
+    if ( dx.norm() <= args_.eps*xstar_norm ) {
+      cout << "[info] converged after " << iter+1 << " iterations\n";
+      break;
+    }
+  }
+  // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;
   return 0;

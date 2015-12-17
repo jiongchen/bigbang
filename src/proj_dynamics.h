@@ -16,7 +16,7 @@ using pfunc_t=std::shared_ptr<Functional<double>>;
 struct proj_dyn_args {
   double rho, h;
   size_t maxiter;
-  int method;
+  int method; // 0-FMS; 1-kovalsky; 2-modified FMS
   double eps;
   double ws;  // for stretch
   double wb;  // for bending
@@ -38,6 +38,7 @@ public:
 private:
   int advance_alpha(double *x) const;
   int advance_beta(double *x) const;
+  int advance_gamma(double *x) const;
 private:
   const mati_t &tris_;
   const matd_t &nods_;
@@ -49,7 +50,6 @@ private:
 
   const size_t dim_;
   Eigen::SparseMatrix<double> LHS_;
-  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
 };
 
 }
