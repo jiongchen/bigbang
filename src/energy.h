@@ -266,6 +266,23 @@ private:
   matd_t cotv_, area_;
 };
 
+class tet_arap_energy : public Functional<double>
+{
+public:
+  tet_arap_energy(const mati_t &tets, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void LocalSolve(const double *x);
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &tets_;
+  matd_t vol_;
+  matd_t R_, D_;
+};
+
 }
 
 #endif

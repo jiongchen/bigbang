@@ -5,6 +5,7 @@ optimprefix : tt$
 
 f: openw("elasticity.f90")$
 
+/* mass spring */
 block(
   [X, d],
   X: genmatrix(X, 3, 2),
@@ -26,6 +27,7 @@ block(
   return()
 )$
 
+/* hinge based bending */
 block(
   [X, d, l, area],
   X: genmatrix(X, 3, 4),
@@ -54,6 +56,7 @@ block(
   return()
 )$
 
+/* curve bending */
 block(
   [X, d1, d2],
   X: genmatrix(X, 3, 4),
@@ -73,10 +76,12 @@ block(
   return()
 )$
 
+/* 3D elasticity */
 block(
   [X, D, volume, lam, miu],
   X: genmatrix(X, 3, 4),
   D: genmatrix(D, 3, 3),
+  R: genmatrix(R, 3, 3),
   volume: genmatrix(volume, 1, 1),
   lam: genmatrix(lam, 1, 1),
   miu: genmatrix(miu, 1, 1),
@@ -109,9 +114,18 @@ block(
   ),
   with_stdout(f, val_jac_hes_to_f90(tet_neohookean, [X, D, volume, lam, miu])),
   
+  tet_arap(X, D, R, volume) := block(
+    [DS, F],
+    DS: addcol(col(X,2)-col(X,1), col(X,3)-col(X,1), col(X,4)-col(X,1)),
+    F: DS.D,
+    volume*(mat_norm(F-R, frobenius)^2)
+  ),
+  with_stdout(f, val_jac_hes_to_f90(tet_arap, [X, D, R, volume])),
+  
   return()
 )$
 
+/* hex elasticity */
 block(
   [X, h, lam, miu],
   X: genmatrix(X, 3, 8),

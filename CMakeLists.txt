@@ -43,6 +43,13 @@ endif(LBFGS_FOUND)
 # ARPACK
 find_package(Arpack REQUIRED)
 
+# CUDA
+find_package(CUDA)
+if(CUDA_FOUND)
+    add_definitions(-DUSE_CUDA)
+    include_directories(${CUDA_INCLUDE_DIRS})
+endif(CUDA_FOUND)
+
 add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(tmp)

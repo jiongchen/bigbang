@@ -12,9 +12,9 @@
 using namespace std;
 using namespace bigbang;
 using namespace zjucad::matrix;
-namespace po = boost::program_options;
+namespace po=boost::program_options;
 
-namespace test_proj_dyn {
+namespace test_proj_dyn_tet {
 struct argument {
   string input_mesh;
   string input_cons;
@@ -50,8 +50,7 @@ int main(int argc, char *argv[])
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
       ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
-      ("ws", po::value<double>()->default_value(1e4), "set the stretch weight")
-      ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
+      ("ws", po::value<double>()->default_value(1e3), "set the arap weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
       ("wp", po::value<double>()->default_value(1e3), "set the position weight")
       ;
@@ -62,7 +61,7 @@ int main(int argc, char *argv[])
     cout << desc << endl;
     return __LINE__;
   }
-  test_proj_dyn::argument args; {
+  test_proj_dyn_tet::argument args; {
     args.input_mesh = vm["input_mesh"].as<string>();
     args.input_cons = vm["input_cons"].as<string>();
     args.output_folder = vm["output_folder"].as<string>();
@@ -73,7 +72,6 @@ int main(int argc, char *argv[])
     args.proj_args.method = vm["method"].as<int>();
     args.proj_args.eps = vm["tolerance"].as<double>();
     args.proj_args.ws = vm["ws"].as<double>();
-    args.proj_args.wb = vm["wb"].as<double>();
     args.proj_args.wg = vm["wg"].as<double>();
     args.proj_args.wp = vm["wp"].as<double>();
   }
@@ -82,13 +80,13 @@ int main(int argc, char *argv[])
     boost::filesystem::create_directory(args.output_folder);
 
   // load input
-  mati_t tris; matd_t nods;
-  jtf::mesh::load_obj(args.input_mesh.c_str(), tris, nods);
+  mati_t tets; matd_t nods;
+  jtf::mesh::tet_mesh_read_from_zjumat(args.input_mesh.c_str(), &nods, &tets);
   vector<size_t> fixed;
   read_fixed_verts(args.input_cons.c_str(), fixed);
 
   // init the solver
-  proj_dyn_spring_solver solver(tris, nods);
+  proj_dyn_tet_solver solver(tets, nods);
   solver.initialize(args.proj_args);
 
   // initial boudary conditions
@@ -102,15 +100,11 @@ int main(int argc, char *argv[])
   double f[3] = {-200, 0, -200};
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
-    sprintf(outfile, "%s/frame_method%d_ws%.1e_wb%.1e_wg%.1e_wp%.1e_m%zu_%zu.vtk",
-            args.output_folder.c_str(), args.proj_args.method, args.proj_args.ws, args.proj_args.wb,
+    sprintf(outfile, "%s/frame_method%d_ws%.1e_wg%.1e_wp%.1e_m%zu_%zu.vtk",
+            args.output_folder.c_str(), args.proj_args.method, args.proj_args.ws,
             args.proj_args.wg, args.proj_args.wp, args.proj_args.maxiter, i);
     ofstream os(outfile);
-    tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
-
-    APPLY_FORCE(0, 3, f);
-    REMOVE_FORCE(40, 3);
-    RELEASE_VERT(160, 2);
+    tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
 
     solver.advance(&nods[0]);
   }

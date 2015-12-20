@@ -14,13 +14,13 @@ namespace bigbang {
 
 static Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
 
-proj_dyn_solver::proj_dyn_solver(const mati_t &tris, const matd_t &nods)
+proj_dyn_spring_solver::proj_dyn_spring_solver(const mati_t &tris, const matd_t &nods)
   : tris_(tris), nods_(nods), dim_(nods.size()) {
   get_edge_elem(tris_, edges_);
   get_diam_elem(tris_, diams_);
 }
 
-int proj_dyn_solver::initialize(const proj_dyn_args &args) {
+int proj_dyn_spring_solver::initialize(const proj_dyn_args &args) {
   cout << "[info] init the projective dynamics solver";
   args_ = args;
 
@@ -47,23 +47,23 @@ int proj_dyn_solver::initialize(const proj_dyn_args &args) {
   return 0;
 }
 
-int proj_dyn_solver::pin_down_vert(const size_t id, const double *pos) {
+int proj_dyn_spring_solver::pin_down_vert(const size_t id, const double *pos) {
   return dynamic_pointer_cast<positional_potential>(impebf_[2])->Pin(id, pos);
 }
 
-int proj_dyn_solver::release_vert(const size_t id) {
+int proj_dyn_spring_solver::release_vert(const size_t id) {
   return dynamic_pointer_cast<positional_potential>(impebf_[2])->Release(id);
 }
 
-int proj_dyn_solver::apply_force(const size_t id, const double *f) {
+int proj_dyn_spring_solver::apply_force(const size_t id, const double *f) {
   return dynamic_pointer_cast<ext_force_energy>(impebf_[4])->ApplyForce(id, f);
 }
 
-int proj_dyn_solver::remove_force(const size_t id) {
+int proj_dyn_spring_solver::remove_force(const size_t id) {
   return dynamic_pointer_cast<ext_force_energy>(impebf_[4])->RemoveForce(id);
 }
 
-int proj_dyn_solver::precompute() {
+int proj_dyn_spring_solver::precompute() {
   cout << "[info] solver is doing precomputation";
   ASSERT(dim_ == impE_->Nx());
   vector<Triplet<double>> trips;
@@ -77,18 +77,20 @@ int proj_dyn_solver::precompute() {
   return 0;
 }
 
-int proj_dyn_solver::advance(double *x) const {
+int proj_dyn_spring_solver::advance(double *x) const {
   int rtn = 0;
   switch ( args_.method ) {
     case 0: rtn = advance_alpha(x); break;
     case 1: rtn = advance_beta(x); break;
     case 2: rtn = advance_gamma(x); break;
+    case 3: rtn = advance_delta(x); break;
+    case 4: rtn = advance_epsilon(x); break;
     default: return __LINE__;
   }
   return rtn;
 }
 
-int proj_dyn_solver::advance_alpha(double *x) const {
+int proj_dyn_spring_solver::advance_alpha(double *x) const {
   ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -130,7 +132,7 @@ int proj_dyn_solver::advance_alpha(double *x) const {
   return 0;
 }
 
-int proj_dyn_solver::advance_beta(double *x) const {
+int proj_dyn_spring_solver::advance_beta(double *x) const {
   ASSERT(args_.method == 1);
   Map<VectorXd> X(x, dim_);
   auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
@@ -196,7 +198,7 @@ int proj_dyn_solver::advance_beta(double *x) const {
   return 0;
 }
 
-int proj_dyn_solver::advance_gamma(double *x) const {
+int proj_dyn_spring_solver::advance_gamma(double *x) const {
   ASSERT(args_.method == 2);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -234,6 +236,143 @@ int proj_dyn_solver::advance_gamma(double *x) const {
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+static std::vector<Eigen::Vector3d> record;
+
+int proj_dyn_spring_solver::advance_delta(double *x) const {
+  ASSERT(args_.method == 3);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X;
+  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  Map<const MatrixXd> d(fms->get_aux_var(), 3, fms->aux_dim()/3);
+  // iterate solve
+  record.clear();
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 100 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    /*+++++++++++++++++++++++++++*/
+    record.push_back(d.col(0));
+    /*+++++++++++++++++++++++++++*/
+
+    // local step for constraint projection
+    fms->LocalSolve(&xstar[0]);
+    // global step for compatible position
+    VectorXd jac = VectorXd::Zero(dim_); {
+      impE_->Gra(&xstar[0], &jac[0]);
+    }
+    VectorXd dx = -solver_.solve(jac);
+    double xstar_norm = xstar.norm();
+    xstar += dx;
+    if ( dx.norm() <= args_.eps*xstar_norm ) {
+      cout << "[info] converged after " << iter+1 << " iterations\n";
+      break;
+    }
+  }
+  // update configuration
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+int proj_dyn_spring_solver::advance_epsilon(double *x) const {
+  ASSERT(args_.method == 4);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X;
+  // chebyshev iteration
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+
+  }
+  return 0;
+}
+
+//====================== tetrahedral projective solver =========================
+proj_dyn_tet_solver::proj_dyn_tet_solver(const mati_t &tets, const matd_t &nods)
+  : tets_(tets), nods_(nods), dim_(nods.size()) {}
+
+int proj_dyn_tet_solver::initialize(const proj_dyn_args &args) {
+  cout << "[info] init the projective dynamics solver...";
+  args_ = args;
+
+  ebf_.resize(5);
+  ebf_[0] = make_shared<momentum_potential_imp_euler>(tets_, nods_, args_.rho, args_.h);
+  ebf_[1] = make_shared<tet_arap_energy>(tets_, nods_, args_.ws);
+  ebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
+  ebf_[3] = make_shared<gravitational_potential>(tets_, nods_, args_.rho, args_.wg);
+  ebf_[4] = make_shared<ext_force_energy>(nods_, 1e0);
+
+  try {
+    energy_ = make_shared<energy_t<double>>(ebf_);
+  } catch ( exception &e ) {
+    cerr << "[exception] " << e.what() << endl;
+    exit(EXIT_FAILURE);
+  }
+  cout << "done\n";
+  return 0;
+}
+
+int proj_dyn_tet_solver::pin_down_vert(const size_t id, const double *pos) {
+  return dynamic_pointer_cast<positional_potential>(ebf_[2])->Pin(id, pos);
+}
+
+int proj_dyn_tet_solver::release_vert(const size_t id) {
+  return dynamic_pointer_cast<positional_potential>(ebf_[2])->Release(id);
+}
+
+int proj_dyn_tet_solver::apply_force(const size_t id, const double *f) {
+  return dynamic_pointer_cast<ext_force_energy>(ebf_[4])->ApplyForce(id, f);
+}
+
+int proj_dyn_tet_solver::remove_force(const size_t id) {
+  return dynamic_pointer_cast<ext_force_energy>(ebf_[4])->RemoveForce(id);
+}
+
+int proj_dyn_tet_solver::precompute() {
+  cout << "[info] solver is doing precomputation";
+  ASSERT(dim_ == energy_->Nx());
+  vector<Triplet<double>> trips;
+  energy_->Hes(nullptr, &trips);
+  LHS_.resize(dim_, dim_);
+  LHS_.reserve(trips.size());
+  LHS_.setFromTriplets(trips.begin(), trips.end());
+  solver_.compute(LHS_);
+  ASSERT(solver_.info() == Success);
+  cout << "......done\n";
+  return 0;
+}
+
+int proj_dyn_tet_solver::advance(double *x) const {
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X;
+  const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
+  // iterate solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 10 == 0 ) {
+      double value = 0;
+      energy_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    // local step for constraint projection
+    arap->LocalSolve(&xstar[0]);
+    // global step for compatible position
+    VectorXd jac = VectorXd::Zero(dim_); {
+      energy_->Gra(&xstar[0], &jac[0]);
+    }
+    VectorXd dx = -solver_.solve(jac);
+    double xstar_norm = xstar.norm();
+    xstar += dx;
+    if ( dx.norm() <= args_.eps*xstar_norm ) {
+      cout << "\t@CONVERGED after " << iter+1 << " iterations\n";
+      break;
+    }
+  }
+  // update configuration
+  dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
   X = xstar;
   return 0;
 }

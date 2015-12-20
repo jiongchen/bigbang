@@ -77,3 +77,9 @@ target_link_libraries(test_fast_proj
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_proj_dyn_tet test_proj_dyn_tet.cc)
+target_link_libraries(test_proj_dyn_tet
+    bigbang
+    ${Boost_LIBRARIES}
+)
