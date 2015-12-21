@@ -5,6 +5,32 @@ optimprefix : tt$
 
 f: openw("elasticity.f90")$
 
+/* BW98 */
+block(
+  [X, invUV, area],
+  X: genmatrix(X, 3, 3),
+  invUV: genmatrix(invUV, 2, 2),
+  area: genmatrix(area, 1, 1),
+  
+  bw98_stretch(X, invUV, area) := block(
+    [E, W],
+    E: addcol(col(X, 2)-col(X, 1), col(X, 3)-col(X, 1)),
+    W: E.invUV,
+    0.5*area*( (NORM(col(W, 1))-1.0)^2 + (NORM(col(W, 2))-1.0)^2 )
+  ),
+  with_stdout(f, val_jac_hes_to_f90(bw98_stretch, [X, invUV, area])),
+  
+  bw98_shear(X, invUV, area) := block(
+    [E, W],
+    E: addcol(col(X, 2)-col(X, 1), col(X, 3)-col(X, 1)),
+    W: E.invUV,
+    0.5*area*( (NORM(col(W, 1)+col(W, 2))-sqrt(2.0))^2 + (NORM(col(W, 1)-col(W, 2))-sqrt(2.0))^2 )
+  ),
+  with_stdout(f, val_jac_hes_to_f90(bw98_shear, [X, invUV, area])),
+  
+  return()
+)$
+
 /* mass spring */
 block(
   [X, d],

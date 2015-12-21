@@ -1,14 +1,18 @@
 #include "proj_dynamics.h"
 
+#include <fstream>
 #include <iostream>
+#include <Eigen/Dense>
 
 #include "def.h"
 #include "energy.h"
 #include "geom_util.h"
 #include "config.h"
+#include "vtk.h"
 
 using namespace std;
 using namespace Eigen;
+using namespace zjucad::matrix;
 
 namespace bigbang {
 
@@ -30,6 +34,8 @@ int proj_dyn_spring_solver::initialize(const proj_dyn_args &args) {
     case 0: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
     case 1: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
     case 2: impebf_[1] = make_shared<modified_fms_energy>(edges_, nods_, args_.ws); break;
+    case 3: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
+    case 4: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
     default: break;
   }
   impebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
@@ -90,7 +96,7 @@ int proj_dyn_spring_solver::advance(double *x) const {
   return rtn;
 }
 
-int proj_dyn_spring_solver::advance_alpha(double *x) const {
+int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Liu13
   ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -132,7 +138,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const {
   return 0;
 }
 
-int proj_dyn_spring_solver::advance_beta(double *x) const {
+int proj_dyn_spring_solver::advance_beta(double *x) const { /// @brief Kovalsky15
   ASSERT(args_.method == 1);
   Map<VectorXd> X(x, dim_);
   auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
@@ -198,7 +204,7 @@ int proj_dyn_spring_solver::advance_beta(double *x) const {
   return 0;
 }
 
-int proj_dyn_spring_solver::advance_gamma(double *x) const {
+int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified, fail
   ASSERT(args_.method == 2);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -242,7 +248,7 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const {
 
 static std::vector<Eigen::Vector3d> record;
 
-int proj_dyn_spring_solver::advance_delta(double *x) const {
+int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
   ASSERT(args_.method == 3);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -256,12 +262,11 @@ int proj_dyn_spring_solver::advance_delta(double *x) const {
       impE_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
+    // local step for constraint projection
+    fms->LocalSolve(&xstar[0]);
     /*+++++++++++++++++++++++++++*/
     record.push_back(d.col(0));
     /*+++++++++++++++++++++++++++*/
-
-    // local step for constraint projection
-    fms->LocalSolve(&xstar[0]);
     // global step for compatible position
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
@@ -280,15 +285,38 @@ int proj_dyn_spring_solver::advance_delta(double *x) const {
   return 0;
 }
 
-int proj_dyn_spring_solver::advance_epsilon(double *x) const {
+int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Direct+Chebyshev
   ASSERT(args_.method == 4);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
-  // chebyshev iteration
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
 
   }
   return 0;
+}
+
+void proj_dyn_spring_solver::calc_convergence_rate(const char *result) const {
+  cout << "[info] Analyse the rate of convergence\n";
+  cout << record.size() << endl;
+//  const size_t last = record.size()-1;
+//  for (size_t i = 1; i < record.size(); ++i) {
+//    double curr = (record[i]-record[last]).norm();
+//    double prev = (record[i-1]-record[last]).norm();
+//    cout << "[info] ratio: " << curr/prev << endl;
+//  }
+  vector<double> pts;
+  for (size_t i = 1; i < record.size(); ++i) {
+    Vector3d axis = (record[0].cross(record[i])).normalized();
+    double angle = acos(record[0].dot(record[i])/(record[0].norm()*record[i].norm()));
+//    cout << "point: " << i << " angle: " << angle/M_PI*180 << endl;
+    axis *= angle;
+    pts.push_back(axis[0]);
+    pts.push_back(axis[1]);
+    pts.push_back(axis[2]);
+  }
+  ofstream os(result);
+  mati_t p = colon(0, record.size()-1);
+  point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
 }
 
 //====================== tetrahedral projective solver =========================
@@ -347,6 +375,17 @@ int proj_dyn_tet_solver::precompute() {
 }
 
 int proj_dyn_tet_solver::advance(double *x) const {
+  int rtn = 0;
+  switch ( args_.method ) {
+    case 0: rtn = advance_alpha(x); break;
+    case 1: rtn = advance_beta(x); break;
+    default: return __LINE__;
+  }
+  return rtn;
+}
+
+int proj_dyn_tet_solver::advance_alpha(double *x) const {
+  ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
@@ -374,6 +413,12 @@ int proj_dyn_tet_solver::advance(double *x) const {
   // update configuration
   dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
   X = xstar;
+  return 0;
+}
+
+int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Chebyshev
+  ASSERT(args_.method == 1);
+  // chebyshev semi-iterative approach
   return 0;
 }
 

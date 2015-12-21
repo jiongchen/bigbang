@@ -6,6 +6,7 @@
 #include <zjucad/matrix/itr_matrix.h>
 #include <zjucad/matrix/io.h>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <jtflib/mesh/util.h>
 
 #include "mass_matrix.h"
 #include "config.h"
@@ -59,6 +60,14 @@ void calc_dih_angle_hes_(double *hes, const double *x);
 void surf_bending_(double *val, const double *x, const double *d, const double *l, const double *area);
 void surf_bending_jac_(double *jac, const double *x, const double *d, const double *l, const double *area);
 void surf_bending_hes_(double *hes, const double *x, const double *d, const double *l, const double *area);
+
+void bw98_stretch_(double *val, const double *x, const double *invUV, const double *area);
+void bw98_stretch_jac_(double *jac, const double *x, const double *invUV, const double *area);
+void bw98_stretch_hes_(double *hes, const double *x, const double *invUV, const double *area);
+
+void bw98_shear_(double *val, const double *x, const double *invUV, const double *area);
+void bw98_shear_jac_(double *jac, const double *x, const double *invUV, const double *area);
+void bw98_shear_hes_(double *hes, const double *x, const double *invUV, const double *area);
 
 void line_bending_(double *val, const double *x, const double *d1, const double *d2);
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
@@ -1087,6 +1096,167 @@ void tet_arap_energy::LocalSolve(const double *x) {
     JacobiSVD<Matrix3d> svd(F, ComputeFullU|ComputeFullV);
     Map<Matrix3d>(&R_(0, i)) = svd.matrixU()*svd.matrixV().transpose();
   }
+}
+//==============================================================================
+bw98_stretch_energy::bw98_stretch_energy(const mati_t &tris, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), tris_(tris) {
+  // build local frame
+  matd_t O(3, tris_.size(2)), T(3, tris_.size(2)), B(3, tris_.size(2)), N(3, tris_.size(2));
+  jtf::mesh::cal_face_normal(tris, nods, N, true);
+#pragma omp parallel for
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    const matd_t vert = nods(colon(), tris_(colon(), i));
+    O(colon(), i) = vert*ones<double>(3, 1)/3.0;
+    T(colon(), i) = vert(colon(), 1)-vert(colon(), 0);
+    T(colon(), i) /= norm(T(colon(), i));
+    B(colon(), i) = cross(N(colon(), i), T(colon(), i));
+    B(colon(), i) /= norm(B(colon(), i));
+  }
+  // calc inv(u, v) and area
+  invUV_.resize(4, tris_.size(2));
+  area_.resize(tris_.size(2), 1);
+#pragma omp parallel for
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    const matd_t vert = nods(colon(), tris_(colon(), i));
+    matd_t uv(2, 3);
+    for (size_t j = 0; j < 3; ++j) {
+      uv(0, j) = dot(vert(colon(), j)-O(colon(), i), T(colon(), i));
+      uv(1, j) = dot(vert(colon(), j)-O(colon(), i), B(colon(), i));
+    }
+    matd_t base = uv(colon(), colon(1, 2))-uv(colon(), 0)*ones<double>(1, 2);
+    if ( inv(base) ) {
+      cerr << "\t@degenerated triangle " << i << endl;
+      exit(EXIT_FAILURE);
+    }
+    std::copy(base.begin(), base.end(), &invUV_(0, i));
+    area_[i] = calc_tri_area(vert);
+  }
+}
+
+size_t bw98_stretch_energy::Nx() const {
+  return dim_;
+}
+
+int bw98_stretch_energy::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    double value = 0;
+    bw98_stretch_(&value, &vert[0], &invUV_(0, i), &area_[i]);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int bw98_stretch_energy::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    matd_t jac = zeros<double>(3, 3);
+    bw98_stretch_jac_(&jac[0], &vert[0], &invUV_(0, i), &area_[i]);
+    G(colon(), tris_(colon(), i)) += w_*jac;
+  }
+  return 0;
+}
+
+int bw98_stretch_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    matd_t H = zeros<double>(9, 9);
+    bw98_stretch_hes_(&H[0], &vert[0], &invUV_(0, i), &area_[i]);
+    for (size_t p = 0; p < 9; ++p) {
+      for (size_t q = 0; q < 9; ++q) {
+        const size_t I = 3*tris_(p/3, i)+p%3;
+        const size_t J = 3*tris_(q/3, i)+q%3;
+        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
+}
+//==============================================================================
+bw98_shear_energy::bw98_shear_energy(const mati_t &tris, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), tris_(tris) {
+  // build local frame
+  matd_t O(3, tris_.size(2)), T(3, tris_.size(2)), B(3, tris_.size(2)), N(3, tris_.size(2));
+  jtf::mesh::cal_face_normal(tris, nods, N, true);
+#pragma omp parallel for
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    const matd_t vert = nods(colon(), tris_(colon(), i));
+    O(colon(), i) = vert*ones<double>(3, 1)/3.0;
+    T(colon(), i) = vert(colon(), 1)-vert(colon(), 0);
+    T(colon(), i) /= norm(T(colon(), i));
+    B(colon(), i) = cross(N(colon(), i), T(colon(), i));
+    B(colon(), i) /= norm(B(colon(), i));
+  }
+  // calc inv(u, v) and area
+  invUV_.resize(4, tris_.size(2));
+  area_.resize(tris_.size(2), 1);
+#pragma omp parallel for
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    const matd_t vert = nods(colon(), tris_(colon(), i));
+    matd_t uv(2, 3);
+    for (size_t j = 0; j < 3; ++j) {
+      uv(0, j) = dot(vert(colon(), j)-O(colon(), i), T(colon(), i));
+      uv(1, j) = dot(vert(colon(), j)-O(colon(), i), B(colon(), i));
+    }
+    matd_t base = uv(colon(), colon(1, 2))-uv(colon(), 0)*ones<double>(1, 2);
+    inv(base);
+    std::copy(base.begin(), base.end(), &invUV_(0, i));
+    area_[i] = calc_tri_area(vert);
+  }
+}
+
+size_t bw98_shear_energy::Nx() const {
+  return dim_;
+}
+
+int bw98_shear_energy::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    double value = 0;
+    bw98_shear_(&value, &vert[0], &invUV_(0, i), &area_[i]);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int bw98_shear_energy::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    matd_t jac = zeros<double>(3, 3);
+    bw98_shear_jac_(&jac[0], &vert[0], &invUV_(0, i), &area_[i]);
+    G(colon(), tris_(colon(), i)) += w_*jac;
+  }
+  return 0;
+}
+
+int bw98_shear_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    matd_t H = zeros<double>(9, 9);
+    bw98_shear_hes_(&H[0], &vert[0], &invUV_(0, i), &area_[i]);
+    for (size_t p = 0; p < 9; ++p) {
+      for (size_t q = 0; q < 9; ++q) {
+        const size_t I = 3*tris_(p/3, i)+p%3;
+        const size_t J = 3*tris_(q/3, i)+q%3;
+        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
 }
 //==============================================================================
 }

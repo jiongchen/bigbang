@@ -283,6 +283,38 @@ private:
   matd_t R_, D_;
 };
 
+class bw98_stretch_energy : public Functional<double>
+{
+public:
+  bw98_stretch_energy(const mati_t &tris, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &tris_;
+  matd_t area_;
+  matd_t invUV_;
+};
+
+class bw98_shear_energy : public Functional<double>
+{
+public:
+  bw98_shear_energy(const mati_t &tris, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &tris_;
+  matd_t area_;
+  matd_t invUV_;
+};
+
 }
 
 #endif

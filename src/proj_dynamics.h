@@ -44,6 +44,7 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
+  void calc_convergence_rate(const char *result) const;
 private:
   int advance_alpha(double *x) const;
   int advance_beta(double *x) const;
@@ -74,6 +75,9 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
+private:
+  int advance_alpha(double *x) const;
+  int advance_beta(double *x) const;
 private:
   const mati_t &tets_;
   const matd_t &nods_;

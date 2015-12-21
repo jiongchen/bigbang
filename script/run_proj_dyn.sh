@@ -13,4 +13,5 @@ elif [ ! -e "$mesh" ]; then
   exit 1
 fi
 
-time $exe -i $mesh -c $cons -o $outfolder --wb 0.000 --method $1 -m 20000 -n 2
+#time $exe -i $mesh -c $cons -o $outfolder --wb 0.000 --method $1 -m 20000 -n 2
+time $exe -i $mesh -c $cons -o ../build/bin/proj_dyn/timestep0.033 -t 0.033 --wb 0.01 --method 3 -m 25000 -n 1

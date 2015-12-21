@@ -26,6 +26,7 @@ struct argument {
   double density;
   double timestep;
   size_t total_frame;
+  int bw98;
   double ws, wb, wg, wp;
 };
 }
@@ -55,6 +56,7 @@ int main(int argc, char *argv[])
       ("density,d", po::value<double>()->default_value(1.0), "set the density")
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("total_frame,n", po::value<size_t>()->default_value(200), "set the frame number")
+      ("bw98", po::value<int>()->default_value(0), "adopt BW98 stretch model?")
       ("ws", po::value<double>()->default_value(1e2), "set the stretch weight")
       ("wb", po::value<double>()->default_value(1e-3), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
@@ -74,6 +76,7 @@ int main(int argc, char *argv[])
     vm["density"].as<double>(),
     vm["timestep"].as<double>(),
     vm["total_frame"].as<size_t>(),
+    vm["bw98"].as<int>(),
     vm["ws"].as<double>(),
     vm["wb"].as<double>(),
     vm["wg"].as<double>(),
@@ -95,10 +98,18 @@ int main(int argc, char *argv[])
   get_diam_elem(tris, diams);
 
   // assemble energies
-  vector<shared_ptr<Functional<double>>> ebf(6);
+  vector<shared_ptr<Functional<double>>> ebf(7);
   shared_ptr<Functional<double>> energy;
   ebf[0] = make_shared<momentum_potential_imp_euler>(tris, nods, args.density, args.timestep, 1e0);
-  ebf[1] = make_shared<spring_potential>(edges, nods, args.ws);
+  switch ( args.bw98 ) {
+    case 0:
+      ebf[1] = make_shared<spring_potential>(edges, nods, args.ws);
+      break;
+    default:
+      ebf[1] = make_shared<bw98_stretch_energy>(tris, nods, args.ws);
+      ebf[6] = make_shared<bw98_shear_energy>(tris, nods, args.ws/2.0);
+      break;
+  }
   ebf[2] = make_shared<surf_bending_potential>(diams, nods, args.wb);
   ebf[3] = make_shared<gravitational_potential>(tris, nods, args.density, args.wg);
   ebf[4] = make_shared<positional_potential>(nods, args.wp);
@@ -127,7 +138,7 @@ int main(int argc, char *argv[])
     REMOVE_FORCE(40, 3);
     RELEASE_VERT(160, 2);
 
-    newton_solve(&nods[0], nods.size(), energy, optparam);
+    lbfgs_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }
 
