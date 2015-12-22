@@ -113,10 +113,10 @@ int main(int argc, char *argv[])
     RELEASE_VERT(160, 2);
 
     solver.advance(&nods[0]);
-  }
 
-  sprintf(outfile, "%s/rotation_n%zu.vtk", args.output_folder.c_str(), args.total_frame);
-  solver.calc_convergence_rate(outfile);
+    sprintf(outfile, "%s/rotation_%zu.vtk", args.output_folder.c_str(), i);
+    solver.vis_rot(outfile);
+  }
 
   cout << "[info] all done\n";
   return 0;

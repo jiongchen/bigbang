@@ -20,6 +20,7 @@ int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &ar
     return __LINE__;
   }
   SimplicialCholesky<SparseMatrix<double>> sol;
+  sol.setMode(SimplicialCholeskyLDLT);
   Map<VectorXd> X(x, dim);
   VectorXd xstar = X, dx(dim);
   for (size_t iter = 0; iter < args.max_iter; ++iter) {

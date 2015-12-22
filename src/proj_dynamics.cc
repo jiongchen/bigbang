@@ -3,6 +3,8 @@
 #include <fstream>
 #include <iostream>
 #include <Eigen/Dense>
+#include <unsupported/Eigen/MatrixFunctions>
+#include <zjucad/matrix/io.h>
 
 #include "def.h"
 #include "energy.h"
@@ -246,27 +248,33 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified
   return 0;
 }
 
-static std::vector<Eigen::Vector3d> record;
+static std::vector<Eigen::Vector3d> sphere_pts;
+static Eigen::Vector3d d0;
 
 int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
   ASSERT(args_.method == 3);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  Map<const MatrixXd> d(fms->get_aux_var(), 3, fms->aux_dim()/3);
   // iterate solve
-  record.clear();
+  sphere_pts.clear();
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 100 == 0 ) {
+    if ( iter % 1000 == 0 ) {
       double value = 0;
       impE_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
     // local step for constraint projection
     fms->LocalSolve(&xstar[0]);
-    /*+++++++++++++++++++++++++++*/
-    record.push_back(d.col(0));
-    /*+++++++++++++++++++++++++++*/
+
+      static size_t cnt = 0;
+      const size_t eid = 1000;
+      if ( cnt++ == 0 ) {
+        d0 = Vector3d(fms->get_aux_var()+3*eid);
+      }
+      Vector3d edge(fms->get_aux_var()+3*eid);
+      sphere_pts.push_back(edge);
+
     // global step for compatible position
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
@@ -295,27 +303,39 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Direct
   return 0;
 }
 
-void proj_dyn_spring_solver::calc_convergence_rate(const char *result) const {
-  cout << "[info] Analyse the rate of convergence\n";
-  cout << record.size() << endl;
-//  const size_t last = record.size()-1;
-//  for (size_t i = 1; i < record.size(); ++i) {
-//    double curr = (record[i]-record[last]).norm();
-//    double prev = (record[i-1]-record[last]).norm();
-//    cout << "[info] ratio: " << curr/prev << endl;
-//  }
+void proj_dyn_spring_solver::vis_rot(const char *filename) const {
+  cout << "[info] visualize the rotation in log space\n";
   vector<double> pts;
-  for (size_t i = 1; i < record.size(); ++i) {
-    Vector3d axis = (record[0].cross(record[i])).normalized();
-    double angle = acos(record[0].dot(record[i])/(record[0].norm()*record[i].norm()));
-//    cout << "point: " << i << " angle: " << angle/M_PI*180 << endl;
+  for (size_t i = 0; i < sphere_pts.size(); ++i) {
+//    Vector3d axis = (sphere_pts[0].cross(sphere_pts[i]));
+//    if ( axis.norm() < 1e-16 ) {
+//      pts.push_back(0.0);
+//      pts.push_back(0.0);
+//      pts.push_back(0.0);
+//      continue;
+//    }
+//    axis /= axis.norm();
+//    double angle = acos(sphere_pts[0].dot(sphere_pts[i])/(sphere_pts[0].norm()*sphere_pts[i].norm()));
+//    axis *= angle;
+//    pts.push_back(axis[0]);
+//    pts.push_back(axis[1]);
+//    pts.push_back(axis[2]);
+    Vector3d axis = (d0.cross(sphere_pts[i]));
+    if ( axis.norm() < 1e-16 ) {
+      pts.push_back(0.0);
+      pts.push_back(0.0);
+      pts.push_back(0.0);
+      continue;
+    }
+    axis /= axis.norm();
+    double angle = acos(d0.dot(sphere_pts[i])/(d0.norm()*sphere_pts[i].norm()));
     axis *= angle;
     pts.push_back(axis[0]);
     pts.push_back(axis[1]);
     pts.push_back(axis[2]);
   }
-  ofstream os(result);
-  mati_t p = colon(0, record.size()-1);
+  ofstream os(filename);
+  mati_t p = colon(0, sphere_pts.size()-1);
   point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
 }
 
@@ -384,11 +404,14 @@ int proj_dyn_tet_solver::advance(double *x) const {
   return rtn;
 }
 
+static std::vector<Eigen::Vector3d> lie_pts;
+
 int proj_dyn_tet_solver::advance_alpha(double *x) const {
   ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
+  lie_pts.clear();
   // iterate solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
@@ -398,6 +421,12 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const {
     }
     // local step for constraint projection
     arap->LocalSolve(&xstar[0]);
+    {
+      const size_t tid = 5;
+      Matrix3d R(arap->get_aux_var()+9*tid);
+      Matrix3d logR = R.log();
+      lie_pts.push_back(Vector3d(logR(2, 1), logR(0, 2), logR(1, 0)));
+    }
     // global step for compatible position
     VectorXd jac = VectorXd::Zero(dim_); {
       energy_->Gra(&xstar[0], &jac[0]);
@@ -420,6 +449,19 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
   ASSERT(args_.method == 1);
   // chebyshev semi-iterative approach
   return 0;
+}
+
+void proj_dyn_tet_solver::vis_rot(const char *filename) const {
+  cout << "[info] visualize the rotation in log space\n";
+  vector<double> pts;
+  for (size_t i = 0; i < lie_pts.size(); ++i) {
+    pts.push_back(lie_pts[i].x());
+    pts.push_back(lie_pts[i].y());
+    pts.push_back(lie_pts[i].z());
+  }
+  ofstream os(filename);
+  mati_t p = colon(0, lie_pts.size()-1);
+  point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
 }
 
 }

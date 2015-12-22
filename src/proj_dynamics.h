@@ -44,7 +44,7 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
-  void calc_convergence_rate(const char *result) const;
+  void vis_rot(const char *filename) const;
 private:
   int advance_alpha(double *x) const;
   int advance_beta(double *x) const;
@@ -75,6 +75,7 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
+  void vis_rot(const char *filename) const;
 private:
   int advance_alpha(double *x) const;
   int advance_beta(double *x) const;

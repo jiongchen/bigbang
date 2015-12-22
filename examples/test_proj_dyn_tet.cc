@@ -107,6 +107,9 @@ int main(int argc, char *argv[])
     tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
 
     solver.advance(&nods[0]);
+
+    sprintf(outfile, "%s/rot_%zu.vtk", args.output_folder.c_str(), i);
+    solver.vis_rot(outfile);
   }
 
   cout << "[info] all done\n";

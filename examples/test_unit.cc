@@ -11,6 +11,8 @@
 #include <zjucad/matrix/itr_matrix.h>
 #include <zjucad/matrix/io.h>
 #include <omp.h>
+#include <Eigen/Geometry>
+#include <unsupported/Eigen/MatrixFunctions>
 
 #include "src/mass_matrix.h"
 #include "src/config.h"
@@ -156,6 +158,17 @@ int test_mat_add_scalar(ptree &pt) {
   return 0;
 }
 
+int test_matrix_log(ptree &pt) {
+  Vector3d axis = Vector3d::Random();
+  axis /= axis.norm();
+  cout << "axis:\n" << axis << endl << endl;
+  double angle = 2.0;
+  cout << "angle:\n" << angle << endl << endl;
+  Matrix3d rot = AngleAxisd(angle, axis).toRotationMatrix();
+  cout << "log(R):\n" << rot.log() << endl << endl;
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -168,6 +181,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_hex_elastic);
     CALL_SUB_PROG(test_mat_add_scalar);
     CALL_SUB_PROG(test_omp_num_threads);
+    CALL_SUB_PROG(test_matrix_log);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);
