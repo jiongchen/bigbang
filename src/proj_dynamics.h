@@ -44,7 +44,8 @@ public:
   int remove_force(const size_t id);
   int precompute();
   int advance(double *x) const;
-  void vis_rot(const char *filename) const;
+  int vis_rot(const char *filename) const;
+  int draw_trajectory(const char *filename) const;
 private:
   int advance_alpha(double *x) const;
   int advance_beta(double *x) const;
@@ -61,7 +62,7 @@ private:
   pfunc_t impE_, expE_;
 
   const size_t dim_;
-  Eigen::SparseMatrix<double> LHS_;
+  Eigen::SparseMatrix<double, Eigen::RowMajor> LHS_;
 };
 
 class proj_dyn_tet_solver

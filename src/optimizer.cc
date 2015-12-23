@@ -164,4 +164,46 @@ int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args &arg
 //  return 0;
 //}
 
+int apply_jacobi(const SparseMatrix<double, RowMajor> &A, const VectorXd &rhs, VectorXd &x) {
+  ASSERT(A.rows() == rhs.rows());
+  ASSERT(A.cols() == x.rows());
+  ASSERT(A.rows() == A.outerSize());
+  VectorXd xtemp(x.rows());
+#pragma omp parallel for
+  for (size_t i = 0; i < A.outerSize(); ++i) {
+    double temp = rhs[i];
+    double diag = 1.0;
+    for (SparseMatrix<double, RowMajor>::InnerIterator it(A, i); it; ++it) {
+      if ( it.col() == i )
+        diag = it.value();
+      else
+        temp -= it.value()*x[it.col()];
+    }
+    xtemp[i] = temp/diag;
+  }
+  x = xtemp;
+  return 0;
+}
+
+int apply_gauss_seidel(const SparseMatrix<double, RowMajor> &A, const VectorXd &rhs, VectorXd &x, bool increase) {
+  ASSERT(A.rows() == rhs.rows());
+  ASSERT(A.cols() == x.rows());
+  const size_t rows = A.rows();
+  const size_t begin = increase ? 0 : rows-1;
+  const size_t end = increase ? rows-1 : 0;
+  const int delta = increase ? 1 : -1;
+  for (size_t i = begin; i != end; i += delta) {
+    double temp = rhs[i];
+    double diag = 1.0;
+    for (SparseMatrix<double, RowMajor>::InnerIterator it(A, i); it; ++it) {
+      if ( it.col() == i )
+        diag = it.value();
+      else
+        temp -= it.value()*x[it.col()];
+    }
+    x[i] = temp/diag;
+  }
+  return 0;
+}
+
 }

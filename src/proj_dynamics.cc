@@ -297,29 +297,47 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Direct
   ASSERT(args_.method == 4);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
+  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  const size_t S = 10;
+  const double rho = 0.9992, gamma = 0.75;
+  // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-
+    if ( iter % 1000 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    // local step for constraint projection
+    fms->LocalSolve(&xstar[0]);
+    // global step for compatible position
+    VectorXd jac = VectorXd::Zero(dim_); {
+      impE_->Gra(&xstar[0], &jac[0]);
+    }
+    VectorXd dx = -solver_.solve(jac);
+    double omega;
+    if ( iter < S ) // delay the chebyshev iteration
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+//    temp = xstar;
+//    xstar = omega*(gamma*dx+xstar-prev_xstar)+prev_xstar;
+//    prev_xstar = temp;
+//    if ( (xstar-prev_xstar).norm() <= args_.eps*prev_xstar.norm() ) {
+//      cout << "[info] converged after " << iter+1 << " iterations\n";
+//      break;
+//    }
   }
   return 0;
 }
 
-void proj_dyn_spring_solver::vis_rot(const char *filename) const {
+int proj_dyn_spring_solver::vis_rot(const char *filename) const {
+  if ( args_.method != 3 )
+    return __LINE__;
   cout << "[info] visualize the rotation in log space\n";
   vector<double> pts;
   for (size_t i = 0; i < sphere_pts.size(); ++i) {
-//    Vector3d axis = (sphere_pts[0].cross(sphere_pts[i]));
-//    if ( axis.norm() < 1e-16 ) {
-//      pts.push_back(0.0);
-//      pts.push_back(0.0);
-//      pts.push_back(0.0);
-//      continue;
-//    }
-//    axis /= axis.norm();
-//    double angle = acos(sphere_pts[0].dot(sphere_pts[i])/(sphere_pts[0].norm()*sphere_pts[i].norm()));
-//    axis *= angle;
-//    pts.push_back(axis[0]);
-//    pts.push_back(axis[1]);
-//    pts.push_back(axis[2]);
     Vector3d axis = (d0.cross(sphere_pts[i]));
     if ( axis.norm() < 1e-16 ) {
       pts.push_back(0.0);
@@ -337,8 +355,27 @@ void proj_dyn_spring_solver::vis_rot(const char *filename) const {
   ofstream os(filename);
   mati_t p = colon(0, sphere_pts.size()-1);
   point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
+  return 0;
 }
 
+int proj_dyn_spring_solver::draw_trajectory(const char *filename) const {
+  if ( args_.method != 3 )
+    return __LINE__;
+  cout << "[info] draw the trajectory of spring direction\n";
+  vector<double> pts;
+  pts.push_back(0.0);
+  pts.push_back(0.0);
+  pts.push_back(0.0);
+  for (size_t i = 0; i < sphere_pts.size(); ++i) {
+    pts.push_back(sphere_pts[i].x());
+    pts.push_back(sphere_pts[i].y());
+    pts.push_back(sphere_pts[i].z());
+  }
+  ofstream os(filename);
+  mati_t p = colon(0, pts.size()/3-1);
+  point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
+  return 0;
+}
 //====================== tetrahedral projective solver =========================
 proj_dyn_tet_solver::proj_dyn_tet_solver(const mati_t &tets, const matd_t &nods)
   : tets_(tets), nods_(nods), dim_(nods.size()) {}

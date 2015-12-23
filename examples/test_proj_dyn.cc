@@ -116,6 +116,8 @@ int main(int argc, char *argv[])
 
     sprintf(outfile, "%s/rotation_%zu.vtk", args.output_folder.c_str(), i);
     solver.vis_rot(outfile);
+    sprintf(outfile, "%s/trajectory_%zu.vtk", args.output_folder.c_str(), i);
+    solver.draw_trajectory(outfile);
   }
 
   cout << "[info] all done\n";

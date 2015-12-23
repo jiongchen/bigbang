@@ -18,6 +18,7 @@
 #include "src/config.h"
 #include "src/vtk.h"
 #include "src/energy.h"
+#include "src/optimizer.h"
 
 using namespace std;
 using namespace Eigen;
@@ -169,6 +170,28 @@ int test_matrix_log(ptree &pt) {
   return 0;
 }
 
+int test_iterative_solve(ptree &pt) {
+  const size_t dim = 1000;
+
+  srand(time(NULL));
+  MatrixXd A = MatrixXd::Random(dim, dim);
+  A = (A.transpose()*A).eval();
+  for (size_t i = 0; i < dim; ++i)
+    A(i, i) += 10.0;
+  SparseMatrix<double, RowMajor> AA(A.sparseView());
+  VectorXd rhs = VectorXd::Random(dim);
+  VectorXd x = VectorXd::Zero(dim);
+  cout << "residual: " << (rhs-AA*x).lpNorm<Infinity>() << endl;
+
+  for (size_t i = 0; i < 2000; ++i)
+    apply_gauss_seidel(AA, rhs, x);
+
+  cout << "residual: " << (rhs-AA*x).lpNorm<Infinity>() << endl;
+  cout << "done\n";
+
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -182,6 +205,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_mat_add_scalar);
     CALL_SUB_PROG(test_omp_num_threads);
     CALL_SUB_PROG(test_matrix_log);
+    CALL_SUB_PROG(test_iterative_solve);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);
