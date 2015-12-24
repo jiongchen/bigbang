@@ -171,24 +171,28 @@ int test_matrix_log(ptree &pt) {
 }
 
 int test_iterative_solve(ptree &pt) {
-  const size_t dim = 1000;
-
-  srand(time(NULL));
-  MatrixXd A = MatrixXd::Random(dim, dim);
-  A = (A.transpose()*A).eval();
-  for (size_t i = 0; i < dim; ++i)
-    A(i, i) += 10.0;
-  SparseMatrix<double, RowMajor> AA(A.sparseView());
-  VectorXd rhs = VectorXd::Random(dim);
-  VectorXd x = VectorXd::Zero(dim);
-  cout << "residual: " << (rhs-AA*x).lpNorm<Infinity>() << endl;
+  MatrixXd A(4, 4);
+//  A << 10, -1, 2, 0.0,
+//      -1, 11, -1, 3,
+//      2, -1, 10, -1,
+//      0, 3, -1, 8;
+  A << 5, 1, -1, -2,
+      2, 8, 1, 3,
+      1, -2, -4, -1,
+      -1, 3, 2, 7;
+  cout << A << endl;
+  VectorXd b(4);
+//  b << 6, 25, -11, 15;
+  b << -2, -6, 6, 12;
+  VectorXd x(4);
+  x.setZero();
+  SparseMatrix<double, RowMajor> AA = A.sparseView();
 
   for (size_t i = 0; i < 2000; ++i)
-    apply_gauss_seidel(AA, rhs, x);
+    apply_gauss_seidel(AA, b, x);
 
-  cout << "residual: " << (rhs-AA*x).lpNorm<Infinity>() << endl;
-  cout << "done\n";
-
+  cout << x << endl;
+  cout << "residual: " << (b-AA*x).lpNorm<Infinity>() << endl;
   return 0;
 }
 

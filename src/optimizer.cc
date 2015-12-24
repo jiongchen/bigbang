@@ -174,7 +174,7 @@ int apply_jacobi(const SparseMatrix<double, RowMajor> &A, const VectorXd &rhs, V
     double temp = rhs[i];
     double diag = 1.0;
     for (SparseMatrix<double, RowMajor>::InnerIterator it(A, i); it; ++it) {
-      if ( it.col() == i )
+      if ( static_cast<size_t>(it.col()) == i )
         diag = it.value();
       else
         temp -= it.value()*x[it.col()];
@@ -188,15 +188,16 @@ int apply_jacobi(const SparseMatrix<double, RowMajor> &A, const VectorXd &rhs, V
 int apply_gauss_seidel(const SparseMatrix<double, RowMajor> &A, const VectorXd &rhs, VectorXd &x, bool increase) {
   ASSERT(A.rows() == rhs.rows());
   ASSERT(A.cols() == x.rows());
-  const size_t rows = A.rows();
-  const size_t begin = increase ? 0 : rows-1;
-  const size_t end = increase ? rows-1 : 0;
+  ASSERT(A.rows() == A.outerSize());
+  const int64_t rows = A.rows();
+  const int64_t begin = increase ? 0 : rows-1;
+  const int64_t end = increase ? rows : -1;
   const int delta = increase ? 1 : -1;
-  for (size_t i = begin; i != end; i += delta) {
+  for (int64_t i = begin; i != end; i += delta) {
     double temp = rhs[i];
     double diag = 1.0;
     for (SparseMatrix<double, RowMajor>::InnerIterator it(A, i); it; ++it) {
-      if ( it.col() == i )
+      if ( static_cast<size_t>(it.col()) == i )
         diag = it.value();
       else
         temp -= it.value()*x[it.col()];

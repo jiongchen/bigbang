@@ -15,12 +15,12 @@ using pfunc_t=std::shared_ptr<Functional<double>>;
 
 /**
  * @param method option:
- * 0-Liu13;
+ * 0-Direct;
  * 1-kovalsky15;
  * 2-modified FMS;
  * 3-todo;
- * 4-direct+chebyshev
- * 5-Jacobi+chebyshev
+ * 4-Jacobi+chebyshev
+ * 5-Direct+chebyshev
 */
 struct proj_dyn_args {
   double rho, h;
@@ -52,6 +52,7 @@ private:
   int advance_gamma(double *x) const;
   int advance_delta(double *x) const;
   int advance_epsilon(double *x) const;
+  int advance_zeta(double *x) const;
 private:
   const mati_t &tris_;
   const matd_t &nods_;
