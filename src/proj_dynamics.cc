@@ -101,7 +101,7 @@ int proj_dyn_spring_solver::advance(double *x) const {
   return rtn;
 }
 
-int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Liu13
+int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
   ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -120,21 +120,104 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Liu13
     }
     double curr_jac_norm = jac.norm();
     if ( curr_jac_norm <= args_.eps ) {
-      cout << "\t@converged after " << iter << " iterations\n";
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
     VectorXd dx = solver_.solve(jac);
-    double xstar_norm = xstar.norm();
     xstar += dx;
-//    if ( dx.norm() <= args_.eps*xstar_norm ) {
-//      cout << "[info] converged after " << iter+1 << " iterations\n";
-//      break;
-//    }
   }
   // update configuration
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Chebyshev
+  ASSERT(args_.method == 5);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X, prev_xstar = xstar;
+  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  const size_t S = 10;
+  const double rho = 0.9992, gamma = 0.75;
+  // iterative solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 1000 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    fms->LocalSolve(&xstar[0]);
+    VectorXd jac = VectorXd::Zero(dim_); {
+      impE_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
+    VectorXd curr_xstar = xstar;
+    xstar += solver_.solve(jac);
+    double omega;
+    if ( iter < S ) // delay the chebyshev iteration
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
+    prev_xstar = curr_xstar;
+  }
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi+Chebyshev
+  ASSERT(args_.method == 4);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X, prev_xstar = xstar;
+  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  const size_t S = 10;
+  const double rho = 0.9992, gamma = 0.75;
+  // iterative solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 1000 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    fms->LocalSolve(&xstar[0]);
+    VectorXd jac = VectorXd::Zero(dim_); {
+      impE_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
+    VectorXd curr_xstar = xstar;
+    apply_jacobi(LHS_, jac, xstar);
+    double omega;
+    if ( iter < S ) // delay the chebyshev iteration
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
+    prev_xstar = curr_xstar;
+  }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;
   return 0;
@@ -142,110 +225,112 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Liu13
 
 int proj_dyn_spring_solver::advance_beta(double *x) const { /// @brief Kovalsky15
   ASSERT(args_.method == 1);
-  Map<VectorXd> X(x, dim_);
-  auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  const size_t fdim = fms->aux_dim();
+  return __LINE__;
+//  Map<VectorXd> X(x, dim_);
+//  auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+//  const size_t fdim = fms->aux_dim();
 
-  VectorXd xstar = X, jac(dim_), eta(dim_);
-  VectorXd z(fdim), n(fdim);
-  Map<const VectorXd> Pz(fms->get_aux_var(), fdim);
-  double d0 = 0;
-  const SparseMatrix<double>& S = fms->get_df_mat();
-  VectorXd next_step(fdim);
+//  VectorXd xstar = X, jac(dim_), eta(dim_);
+//  VectorXd z(fdim), n(fdim);
+//  Map<const VectorXd> Pz(fms->get_aux_var(), fdim);
+//  double d0 = 0;
+//  const SparseMatrix<double>& S = fms->get_df_mat();
+//  VectorXd next_step(fdim);
 
-  // iterative solve
-  VectorXd unkown(dim_+1), inve(dim_), invb(dim_);
-  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 100 == 0 ) {
-      double value = 0;
-      impE_->Val(&xstar[0], &value);
-      cout << "\t@iter " << iter << " energy value: " << value << endl;
-    }
-    // local solve
-    z = S*xstar;
-    fms->LocalSolve(&xstar[0]);
-    n = z-Pz;
-    if ( iter % 100 == 0 ) {
-      cout << "\t@iter " << iter << " normal: " << n.norm() << endl << endl;
-    }
-    // global solve
-    jac.setZero(); {
-      impE_->Gra(&xstar[0], &jac[0]);
-      jac *= -1;
-    }
-    eta = S.transpose()*n;
-    d0 = n.dot(Pz-z);
+//  // iterative solve
+//  VectorXd unkown(dim_+1), inve(dim_), invb(dim_);
+//  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+//    if ( iter % 100 == 0 ) {
+//      double value = 0;
+//      impE_->Val(&xstar[0], &value);
+//      cout << "\t@iter " << iter << " energy value: " << value << endl;
+//    }
+//    // local solve
+//    z = S*xstar;
+//    fms->LocalSolve(&xstar[0]);
+//    n = z-Pz;
+//    if ( iter % 100 == 0 ) {
+//      cout << "\t@iter " << iter << " normal: " << n.norm() << endl << endl;
+//    }
+//    // global solve
+//    jac.setZero(); {
+//      impE_->Gra(&xstar[0], &jac[0]);
+//      jac *= -1;
+//    }
+//    eta = S.transpose()*n;
+//    d0 = n.dot(Pz-z);
 
-    invb = solver_.solve(jac);
-    ASSERT(solver_.info() == Success);
-    inve = solver_.solve(eta);
-    ASSERT(solver_.info() == Success);
+//    invb = solver_.solve(jac);
+//    ASSERT(solver_.info() == Success);
+//    inve = solver_.solve(eta);
+//    ASSERT(solver_.info() == Success);
 
-    if ( n.norm() < args_.eps ) {
-      unkown.head(dim_) = invb;
-    } else {
-      unkown[unkown.size()-1] = (-d0+eta.dot(invb))/eta.dot(inve);
-      unkown.head(dim_) = invb-unkown[unkown.size()-1]*inve;
-    }
-    double xstar_norm = xstar.norm();
-    xstar += unkown.head(dim_);
-    next_step = S*xstar-Pz;
-    if ( iter < 5 ) {
-      cout << "\t@prev step size: " << n.norm() << endl;
-      cout << "\t@post step size: " << next_step.norm() << endl;
-      cout << "\t@dx norm: " << unkown.head(dim_).norm() << endl;
-      cout << "\t@turning angle: " << acos(n.dot(next_step)/(n.norm()*next_step.norm()))/M_PI*180 << "\n\n";
-    }
-    if ( unkown.head(dim_).norm() <= args_.eps*xstar_norm ) {
-      cout << "[info] converged after " << iter+1 << " iterations\n";
-      break;
-    }
-  }
-  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
-  X = xstar;
-  return 0;
+//    if ( n.norm() < args_.eps ) {
+//      unkown.head(dim_) = invb;
+//    } else {
+//      unkown[unkown.size()-1] = (-d0+eta.dot(invb))/eta.dot(inve);
+//      unkown.head(dim_) = invb-unkown[unkown.size()-1]*inve;
+//    }
+//    double xstar_norm = xstar.norm();
+//    xstar += unkown.head(dim_);
+//    next_step = S*xstar-Pz;
+//    if ( iter < 5 ) {
+//      cout << "\t@prev step size: " << n.norm() << endl;
+//      cout << "\t@post step size: " << next_step.norm() << endl;
+//      cout << "\t@dx norm: " << unkown.head(dim_).norm() << endl;
+//      cout << "\t@turning angle: " << acos(n.dot(next_step)/(n.norm()*next_step.norm()))/M_PI*180 << "\n\n";
+//    }
+//    if ( unkown.head(dim_).norm() <= args_.eps*xstar_norm ) {
+//      cout << "[info] converged after " << iter+1 << " iterations\n";
+//      break;
+//    }
+//  }
+//  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+//  X = xstar;
+//  return 0;
 }
 
 int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified, fail
   ASSERT(args_.method == 2);
-  Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X;
-  const auto fms = dynamic_pointer_cast<modified_fms_energy>(impebf_[1]);
-  VectorXd prev_step, next_step;
-  const static SparseMatrix<double>& S = fms->get_df_mat();
-  // iterate solve
-  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 100 == 0 ) {
-      double value = 0;
-      impE_->Val(&xstar[0], &value);
-      cout << "\t@iter " << iter << " energy value: " << value << endl;
-    }
-    // local step for constraint projection
-    fms->LocalSolve(&xstar[0]);
-    prev_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
-    // global step for compatible position
-    VectorXd jac = VectorXd::Zero(dim_); {
-      impE_->Gra(&xstar[0], &jac[0]);
-    }
-    VectorXd dx = -solver_.solve(jac);
-    double xstar_norm = xstar.norm();
-    xstar += dx;
-    next_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
-    if ( iter < 5 ) {
-      cout << "\t@prev step size: " << prev_step.norm() << endl;
-      cout << "\t@post step size: " << next_step.norm() << endl;
-      cout << "\t@dx norm: " << dx.norm() << endl;
-      cout << "\t@turning angle: " << acos(prev_step.dot(next_step)/(prev_step.norm()*next_step.norm()))/M_PI*180 << endl << endl;
-    }
-    if ( dx.norm() <= args_.eps*xstar_norm ) {
-      cout << "[info] converged after " << iter+1 << " iterations\n";
-      break;
-    }
-  }
-  // update configuration
-  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
-  X = xstar;
-  return 0;
+  return __LINE__;
+//  Map<VectorXd> X(x, dim_);
+//  VectorXd xstar = X;
+//  const auto fms = dynamic_pointer_cast<modified_fms_energy>(impebf_[1]);
+//  VectorXd prev_step, next_step;
+//  const static SparseMatrix<double>& S = fms->get_df_mat();
+//  // iterate solve
+//  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+//    if ( iter % 100 == 0 ) {
+//      double value = 0;
+//      impE_->Val(&xstar[0], &value);
+//      cout << "\t@iter " << iter << " energy value: " << value << endl;
+//    }
+//    // local step for constraint projection
+//    fms->LocalSolve(&xstar[0]);
+//    prev_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
+//    // global step for compatible position
+//    VectorXd jac = VectorXd::Zero(dim_); {
+//      impE_->Gra(&xstar[0], &jac[0]);
+//    }
+//    VectorXd dx = -solver_.solve(jac);
+//    double xstar_norm = xstar.norm();
+//    xstar += dx;
+//    next_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
+//    if ( iter < 5 ) {
+//      cout << "\t@prev step size: " << prev_step.norm() << endl;
+//      cout << "\t@post step size: " << next_step.norm() << endl;
+//      cout << "\t@dx norm: " << dx.norm() << endl;
+//      cout << "\t@turning angle: " << acos(prev_step.dot(next_step)/(prev_step.norm()*next_step.norm()))/M_PI*180 << endl << endl;
+//    }
+//    if ( dx.norm() <= args_.eps*xstar_norm ) {
+//      cout << "[info] converged after " << iter+1 << " iterations\n";
+//      break;
+//    }
+//  }
+//  // update configuration
+//  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+//  X = xstar;
+//  return 0;
 }
 
 static std::vector<Eigen::Vector3d> sphere_pts;
@@ -289,94 +374,6 @@ int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
     }
   }
   // update configuration
-  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
-  X = xstar;
-  return 0;
-}
-
-int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi+Chebyshev
-  ASSERT(args_.method == 4);
-  Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X, prev_xstar = xstar;
-  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  const size_t S = 10;
-  const double rho = 0.9992, gamma = 0.75;
-  // iterative solve
-  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 1000 == 0 ) {
-      double value = 0;
-      impE_->Val(&xstar[0], &value);
-      cout << "\t@iter " << iter << " energy value: " << value << endl;
-    }
-    fms->LocalSolve(&xstar[0]);
-    VectorXd jac = VectorXd::Zero(dim_); {
-      impE_->Gra(&xstar[0], &jac[0]);
-      jac *= -1;
-    }
-    VectorXd curr_xstar = xstar;
-    apply_jacobi(LHS_, jac, xstar);
-    double omega;
-    if ( iter < S ) // delay the chebyshev iteration
-      omega = 1.0;
-    else if ( iter == S )
-      omega = 2.0/(2.0-rho*rho);
-    else
-      omega = 4.0/(4.0-rho*rho*omega);
-    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
-    if ( (xstar-curr_xstar).norm() <= args_.eps*curr_xstar.norm() ) {
-      cout << "[info] converged after " << iter+1 << " iterations\n";
-      break;
-    }
-    prev_xstar = curr_xstar;
-  }
-  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
-  X = xstar;
-  return 0;
-}
-
-int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Chebyshev
-  ASSERT(args_.method == 5);
-  Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X, prev_xstar = xstar;
-  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  const size_t S = 10;
-  const double rho = 0.9992, gamma = 0.75;
-  // iterative solve
-  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 1000 == 0 ) {
-      double value = 0;
-      impE_->Val(&xstar[0], &value);
-      cout << "\t@iter " << iter << " energy value: " << value << endl;
-    }
-    fms->LocalSolve(&xstar[0]);
-    VectorXd jac = VectorXd::Zero(dim_); {
-      impE_->Gra(&xstar[0], &jac[0]);
-      jac *= -1;
-    }
-    double curr_jac_norm = jac.norm();
-    if ( curr_jac_norm <= args_.eps ) {
-      cout << "\t@converged after " << iter << " iterations\n";
-      break;
-    }
-    if ( iter % 1000 == 0 ) {
-      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
-    }
-    VectorXd curr_xstar = xstar;
-    xstar += solver_.solve(jac);
-    double omega;
-    if ( iter < S ) // delay the chebyshev iteration
-      omega = 1.0;
-    else if ( iter == S )
-      omega = 2.0/(2.0-rho*rho);
-    else
-      omega = 4.0/(4.0-rho*rho*omega);
-    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
-//    if ( (xstar-curr_xstar).norm() <= args_.eps*curr_xstar.norm() ) {
-//      cout << "[info] converged after " << iter+1 << " iterations\n";
-//      break;
-//    }
-    prev_xstar = curr_xstar;
-  }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;
   return 0;
@@ -501,12 +498,11 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
   lie_pts.clear();
   // iterate solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 10 == 0 ) {
+    if ( iter % 1000 == 0 ) {
       double value = 0;
       energy_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
-    // local step for constraint projection
     arap->LocalSolve(&xstar[0]);
     {
       const size_t tid = 5;
@@ -514,17 +510,20 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
       Matrix3d logR = R.log();
       lie_pts.push_back(Vector3d(logR(2, 1), logR(0, 2), logR(1, 0)));
     }
-    // global step for compatible position
     VectorXd jac = VectorXd::Zero(dim_); {
       energy_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
     }
-    VectorXd dx = -solver_.solve(jac);
-    double xstar_norm = xstar.norm();
-    xstar += dx;
-    if ( dx.norm() <= args_.eps*xstar_norm ) {
-      cout << "\t@CONVERGED after " << iter+1 << " iterations\n";
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
+    VectorXd dx = solver_.solve(jac);
+    xstar += dx;
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
@@ -534,7 +533,45 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
 
 int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Chebyshev
   ASSERT(args_.method == 1);
-  // chebyshev semi-iterative approach
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X, prev_xstar = xstar;
+  const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
+  const size_t S = 10;
+  const double rho = 0.9992, gamma = 0.75;
+  // iterative solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 1000 == 0 ) {
+      double value = 0;
+      energy_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    arap->LocalSolve(&xstar[0]);
+    VectorXd jac = VectorXd::Zero(dim_); {
+      energy_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
+    VectorXd curr_xstar = xstar;
+    xstar += solver_.solve(jac);
+    double omega;
+    if ( iter < S ) // delay the chebyshev iteration
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
+    prev_xstar = curr_xstar;
+  }
+  dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
+  X = xstar;
   return 0;
 }
 
