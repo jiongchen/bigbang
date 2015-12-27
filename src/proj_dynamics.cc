@@ -126,8 +126,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    VectorXd dx = solver_.solve(jac);
-    xstar += dx;
+    xstar += solver_.solve(jac);
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -138,7 +137,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
 int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Chebyshev
   ASSERT(args_.method == 5);
   Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X, prev_xstar = xstar;
+  VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   const size_t S = 10;
   const double rho = 0.9992, gamma = 0.75;
@@ -162,8 +161,7 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    VectorXd curr_xstar = xstar;
-    xstar += solver_.solve(jac);
+    dx = solver_.solve(jac);
     double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
@@ -171,7 +169,8 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
       omega = 2.0/(2.0-rho*rho);
     else
       omega = 4.0/(4.0-rho*rho*omega);
-    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
+    curr_xstar = xstar;
+    xstar = omega*(gamma*dx+curr_xstar-prev_xstar)+prev_xstar;
     prev_xstar = curr_xstar;
   }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -182,7 +181,7 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
 int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi+Chebyshev
   ASSERT(args_.method == 4);
   Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X, prev_xstar = xstar;
+  VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   const size_t S = 10;
   const double rho = 0.9992, gamma = 0.75;
@@ -206,8 +205,8 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    VectorXd curr_xstar = xstar;
-    apply_jacobi(LHS_, jac, xstar);
+    dx.setZero();
+    apply_jacobi(LHS_, jac, dx);
     double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
@@ -215,7 +214,8 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
       omega = 2.0/(2.0-rho*rho);
     else
       omega = 4.0/(4.0-rho*rho*omega);
-    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
+    curr_xstar = xstar;
+    xstar = omega*(gamma*dx+curr_xstar-prev_xstar)+prev_xstar;
     prev_xstar = curr_xstar;
   }
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -483,6 +483,7 @@ int proj_dyn_tet_solver::advance(double *x) const {
   switch ( args_.method ) {
     case 0: rtn = advance_alpha(x); break;
     case 1: rtn = advance_beta(x); break;
+    case 2: rtn = advance_gamma(x); break;
     default: return __LINE__;
   }
   return rtn;
@@ -497,8 +498,9 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
   lie_pts.clear();
   // iterate solve
+  double prev_jac_norm = -1;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 1000 == 0 ) {
+    if ( iter % 10 == 0 ) {
       double value = 0;
       energy_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
@@ -519,11 +521,12 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
       cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
-    if ( iter % 1000 == 0 ) {
-      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    if ( iter % 10 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl;
+      cout << "\t@spectral radius: " << curr_jac_norm/prev_jac_norm << endl << endl;
     }
-    VectorXd dx = solver_.solve(jac);
-    xstar += dx;
+    prev_jac_norm = curr_jac_norm;
+    xstar += solver_.solve(jac);
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
@@ -534,13 +537,13 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
 int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Chebyshev
   ASSERT(args_.method == 1);
   Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X, prev_xstar = xstar;
+  VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
   const size_t S = 10;
-  const double rho = 0.9992, gamma = 0.75;
+  const double rho = 0.87375, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 1000 == 0 ) {
+    if ( iter % 10 == 0 ) {
       double value = 0;
       energy_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
@@ -555,11 +558,10 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
       cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
-    if ( iter % 1000 == 0 ) {
-      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    if ( iter % 10 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl << endl;
     }
-    VectorXd curr_xstar = xstar;
-    xstar += solver_.solve(jac);
+    dx = solver_.solve(jac);
     double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
@@ -567,7 +569,53 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
       omega = 2.0/(2.0-rho*rho);
     else
       omega = 4.0/(4.0-rho*rho*omega);
-    xstar = omega*(gamma*(xstar-curr_xstar)+curr_xstar-prev_xstar)+prev_xstar;
+    curr_xstar = xstar;
+    xstar = omega*(gamma*dx+curr_xstar-prev_xstar)+prev_xstar;
+    prev_xstar = curr_xstar;
+  }
+  dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
+}
+
+int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Chebyshev
+  ASSERT(args_.method == 2);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X, prev_xstar = xstar, dx(dim_), curr_xstar(dim_);
+  const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
+  const size_t S = 10;
+  const double rho = 0.87375, gamma = 0.75;
+  // iterative solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 10 == 0 ) {
+      double value = 0;
+      energy_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    arap->LocalSolve(&xstar[0]);
+    VectorXd jac = VectorXd::Zero(dim_); {
+      energy_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 10 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl << endl;
+    }
+    dx.setZero();
+    apply_jacobi(LHS_, jac, dx);
+    double omega;
+    if ( iter < S ) // delay the chebyshev iteration
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    curr_xstar = xstar;
+    xstar = omega*(gamma*dx+curr_xstar-prev_xstar)+prev_xstar;
     prev_xstar = curr_xstar;
   }
   dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
@@ -576,6 +624,8 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
 }
 
 void proj_dyn_tet_solver::vis_rot(const char *filename) const {
+  if ( args_.method != 0 )
+    return;
   cout << "[info] visualize the rotation in log space\n";
   vector<double> pts;
   for (size_t i = 0; i < lie_pts.size(); ++i) {

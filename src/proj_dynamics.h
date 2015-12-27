@@ -81,6 +81,7 @@ public:
 private:
   int advance_alpha(double *x) const;
   int advance_beta(double *x) const;
+  int advance_gamma(double *x) const;
 private:
   const mati_t &tets_;
   const matd_t &nods_;
@@ -90,7 +91,7 @@ private:
   pfunc_t energy_;
 
   const size_t dim_;
-  Eigen::SparseMatrix<double> LHS_;
+  Eigen::SparseMatrix<double, Eigen::RowMajor> LHS_;
 };
 
 }
