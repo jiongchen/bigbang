@@ -110,6 +110,19 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+
+  const size_t aux_dim = fms->aux_dim();
+  static size_t frame = 0;
+  char xout[256], bout[256];
+  sprintf(xout, "./proj_dyn/compare_trajectory/x_seq_frame_%zu.dat", frame);
+  sprintf(bout, "./proj_dyn/compare_trajectory/b_seq_frame_%zu.dat", frame);
+  ofstream osx(xout, ios::binary), osb(bout, ios::binary);
+  frame++;
+  osx.write((char *)&dim_, sizeof(size_t));          // write x dimension
+  osx.write((char *)&args_.maxiter, sizeof(size_t));
+  osb.write((char *)&aux_dim, sizeof(size_t));       // write d dimension
+  osb.write((char *)&args_.maxiter, sizeof(size_t));
+
   // iterate solve
   CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
@@ -128,6 +141,12 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
       impE_->Gra(&xstar[0], &jac[0]);
       jac *= -1;
     }
+    /// @@ dump x and d @@
+    {
+      osx.write((char *)&xstar[0], dim_*sizeof(double));
+      osb.write((char *)fms->get_aux_var(), aux_dim*sizeof(double));
+    }
+    /// @@ end dump @@
     double curr_jac_norm = jac.norm();
     if ( curr_jac_norm <= args_.eps ) {
       cout << "\t@CONVERGED after " << iter << " iterations\n";

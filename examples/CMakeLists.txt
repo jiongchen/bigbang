@@ -83,3 +83,5 @@ target_link_libraries(test_proj_dyn_tet
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(bin_reader bin_reader.cc)
