@@ -722,6 +722,14 @@ void fast_mass_spring::LocalSolve(const double *x) {
     d_(colon(), i) *= len_[i]/dnorm;
   }
 }
+
+void fast_mass_spring::Project() {
+#pragma omp parallel for
+  for (size_t i = 0; i < d_.size(2); ++i) {
+    double dnorm = norm(d_(colon(), i));
+    d_(colon(), i) *= len_[i]/dnorm;
+  }
+}
 //==============================================================================
 modified_fms_energy::modified_fms_energy(const mati_t &edge, const matd_t &nods, const double w)
   : dim_(nods.size()), w_(w), edge_(edge) {

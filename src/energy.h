@@ -171,17 +171,18 @@ public:
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
   void LocalSolve(const double *x);
+  void Project();
   size_t aux_dim() const { return 3*edge_.size(2); }
   const double* get_aux_var() const { return d_.begin(); }
   const Eigen::SparseMatrix<double>& get_df_mat() const { return S_; }
 public:
   const mati_t &edge_;
+  matd_t len_;
+  matd_t d_;
 private:
   const size_t dim_;
   double w_;
   Eigen::SparseMatrix<double> S_;
-  matd_t len_;
-  matd_t d_;
 };
 
 class modified_fms_energy : public Functional<double>

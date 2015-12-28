@@ -20,6 +20,10 @@ using namespace zjucad::matrix;
 namespace bigbang {
 
 static Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
+static std::vector<Eigen::Vector3d> trajectory;
+
+#define CLEAR_TRAJECTORY(trac) \
+  trajectory.clear();
 
 proj_dyn_spring_solver::proj_dyn_spring_solver(const mati_t &tris, const matd_t &nods)
   : tris_(tris), nods_(nods), dim_(nods.size()) {
@@ -107,6 +111,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   // iterate solve
+  CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
       double value = 0;
@@ -114,6 +119,11 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
     fms->LocalSolve(&xstar[0]);
+    {
+      const size_t eid = 1000;
+      Vector3d edge(fms->get_aux_var()+3*eid);
+      trajectory.push_back(edge);
+    }
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
       jac *= -1;
@@ -142,6 +152,7 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
   const size_t S = 10;
   const double rho = 0.9992, gamma = 0.75;
   // iterative solve
+  CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
       double value = 0;
@@ -149,6 +160,11 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
     fms->LocalSolve(&xstar[0]);
+    {
+      const size_t eid = 1000;
+      Vector3d edge(fms->get_aux_var()+3*eid);
+      trajectory.push_back(edge);
+    }
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
       jac *= -1;
@@ -333,45 +349,48 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified
 //  return 0;
 }
 
-static std::vector<Eigen::Vector3d> sphere_pts;
-static Eigen::Vector3d d0;
 int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
   ASSERT(args_.method == 3);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  Map<const VectorXd> dcurr(fms->get_aux_var(), fms->aux_dim());
-  VectorXd dprev = dcurr;
+  Map<VectorXd> aux_var(fms->d_.begin(), fms->d_.size());
+  VectorXd prev_aux_var = aux_var, curr_aux_var(fms->aux_dim());
+  const size_t S = 10;
+  const double rho = 0.9992, gamma = 0.75;
   // iterate solve
-  sphere_pts.clear();
+  CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
       double value = 0;
       impE_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
-    // local step for constraint projection
+    curr_aux_var = aux_var;
     fms->LocalSolve(&xstar[0]);
-
-      static size_t cnt = 0;
-      const size_t eid = 1000;
-      if ( cnt++ == 0 ) {
-        d0 = Vector3d(fms->get_aux_var()+3*eid);
-      }
-      Vector3d edge(fms->get_aux_var()+3*eid);
-      sphere_pts.push_back(edge);
-
-    // global step for compatible position
+    double omega;
+    if ( iter < S )
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    aux_var = omega*(gamma*(aux_var-curr_aux_var)+curr_aux_var-prev_aux_var)+prev_aux_var;
+    fms->Project();
+    prev_aux_var = curr_aux_var;
     VectorXd jac = VectorXd::Zero(dim_); {
       impE_->Gra(&xstar[0], &jac[0]);
+      jac *= -1.0;
     }
-    VectorXd dx = -solver_.solve(jac);
-    double xstar_norm = xstar.norm();
-    xstar += dx;
-    if ( dx.norm() <= args_.eps*xstar_norm ) {
-      cout << "[info] converged after " << iter+1 << " iterations\n";
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
+    xstar += solver_.solve(jac);
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -380,43 +399,39 @@ int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
 }
 
 int proj_dyn_spring_solver::vis_rot(const char *filename) const {
-  if ( args_.method != 3 )
-    return __LINE__;
-  cout << "[info] visualize the rotation in log space\n";
-  vector<double> pts;
-  for (size_t i = 0; i < sphere_pts.size(); ++i) {
-    Vector3d axis = (d0.cross(sphere_pts[i]));
-    if ( axis.norm() < 1e-16 ) {
-      pts.push_back(0.0);
-      pts.push_back(0.0);
-      pts.push_back(0.0);
-      continue;
-    }
-    axis /= axis.norm();
-    double angle = acos(d0.dot(sphere_pts[i])/(d0.norm()*sphere_pts[i].norm()));
-    axis *= angle;
-    pts.push_back(axis[0]);
-    pts.push_back(axis[1]);
-    pts.push_back(axis[2]);
-  }
-  ofstream os(filename);
-  mati_t p = colon(0, sphere_pts.size()-1);
-  point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
-  return 0;
+  return __LINE__;
+//  if ( args_.method != 3 )
+//    return __LINE__;
+//  cout << "[info] visualize the rotation in log space\n";
+//  vector<double> pts;
+//  for (size_t i = 0; i < sphere_pts.size(); ++i) {
+//    Vector3d axis = (d0.cross(sphere_pts[i]));
+//    if ( axis.norm() < 1e-16 ) {
+//      pts.push_back(0.0);
+//      pts.push_back(0.0);
+//      pts.push_back(0.0);
+//      continue;
+//    }
+//    axis /= axis.norm();
+//    double angle = acos(d0.dot(sphere_pts[i])/(d0.norm()*sphere_pts[i].norm()));
+//    axis *= angle;
+//    pts.push_back(axis[0]);
+//    pts.push_back(axis[1]);
+//    pts.push_back(axis[2]);
+//  }
+//  ofstream os(filename);
+//  mati_t p = colon(0, sphere_pts.size()-1);
+//  point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
+//  return 0;
 }
 
 int proj_dyn_spring_solver::draw_trajectory(const char *filename) const {
-  if ( args_.method != 3 )
-    return __LINE__;
   cout << "[info] draw the trajectory of spring direction\n";
   vector<double> pts;
-  pts.push_back(0.0);
-  pts.push_back(0.0);
-  pts.push_back(0.0);
-  for (size_t i = 0; i < sphere_pts.size(); ++i) {
-    pts.push_back(sphere_pts[i].x());
-    pts.push_back(sphere_pts[i].y());
-    pts.push_back(sphere_pts[i].z());
+  for (size_t i = 0; i < trajectory.size(); ++i) {
+    pts.push_back(trajectory[i].x());
+    pts.push_back(trajectory[i].y());
+    pts.push_back(trajectory[i].z());
   }
   ofstream os(filename);
   mati_t p = colon(0, pts.size()/3-1);

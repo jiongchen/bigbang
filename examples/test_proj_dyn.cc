@@ -114,9 +114,9 @@ int main(int argc, char *argv[])
 
     solver.advance(&nods[0]);
 
-    sprintf(outfile, "%s/rotation_%zu.vtk", args.output_folder.c_str(), i);
+    sprintf(outfile, "%s/rotation_method%d_frame%zu.vtk", args.output_folder.c_str(), args.proj_args.method, i);
     solver.vis_rot(outfile);
-    sprintf(outfile, "%s/trajectory_%zu.vtk", args.output_folder.c_str(), i);
+    sprintf(outfile, "%s/trajectory_method%d_frame%zu.vtk", args.output_folder.c_str(), args.proj_args.method, i);
     solver.draw_trajectory(outfile);
   }
 
