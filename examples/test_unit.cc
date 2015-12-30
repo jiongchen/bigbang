@@ -19,6 +19,7 @@
 #include "src/vtk.h"
 #include "src/energy.h"
 #include "src/optimizer.h"
+#include "src/jacobi.h"
 
 using namespace std;
 using namespace Eigen;
@@ -196,6 +197,34 @@ int test_iterative_solve(ptree &pt) {
   return 0;
 }
 
+#ifdef USE_CUDA
+int test_cuda_jacobi(ptree &pt) {
+  srand(time(NULL));
+  const size_t dim = pt.get<int>("dim.value");
+
+  MatrixXd A = MatrixXd::Random(dim, dim);
+  MatrixXd ATA = A.transpose()*A;
+  for (size_t i = 0; i < dim; ++i)
+    ATA(i, i) += 3000;
+  SparseMatrix<double, RowMajor> M = ATA.sparseView();
+
+  VectorXd b = VectorXd::Random(dim);
+  VectorXd x = VectorXd::Random(dim);
+
+  shared_ptr<cuda_jacobi_solver> solver = make_shared<cuda_jacobi_solver>(M);
+  if ( pt.get<int>("method.value") == 0 ) {
+    for (size_t i = 0; i < pt.get<int>("maxiter.value"); ++i)
+      solver->apply(b, x);
+  } else {
+    for (size_t i = 0; i < pt.get<int>("maxiter.value"); ++i)
+      apply_jacobi(M, b, x);
+  }
+
+  cout << "residual: " << (b-M*x).lpNorm<Infinity>() << endl;
+  return 0;
+}
+#endif
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -210,6 +239,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_omp_num_threads);
     CALL_SUB_PROG(test_matrix_log);
     CALL_SUB_PROG(test_iterative_solve);
+    CALL_SUB_PROG(test_cuda_jacobi);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);

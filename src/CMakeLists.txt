@@ -27,11 +27,19 @@ add_custom_command(OUTPUT stvk_hess_stiff_tensor.f90
 
 add_subdirectory(HLBFGS)
 
-add_library(bigbang SHARED ${header} ${source} potential.f90 pbd_cons.f90 elasticity.f90 nnls.c)
+if(CUDA_FOUND)
+    cuda_add_library(cu-jacobi SHARED jacobi.cu)
+    set(CU_JACOBI_LIBRARY cu-jacobi)
+else(CUDA_FOUND)
+    set(CU_JACOBI_LIBRARY "")
+endif(CUDA_FOUND)
+
+add_library(bigbang SHARED ${source} potential.f90 pbd_cons.f90 elasticity.f90 nnls.c)
 target_link_libraries(bigbang
     jtf-mesh
     ${UMFPACK_LIBRARIES}
     HLBFGS
     ${LBFGS_LIBRARIES}
     ${ARPACK_LIBRARIES}
+    ${CU_JACOBI_LIBRARY}
 )

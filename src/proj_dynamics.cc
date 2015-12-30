@@ -12,6 +12,7 @@
 #include "config.h"
 #include "vtk.h"
 #include "optimizer.h"
+#include "jacobi.h"
 
 using namespace std;
 using namespace Eigen;
@@ -20,6 +21,7 @@ using namespace zjucad::matrix;
 namespace bigbang {
 
 static Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
+static std::shared_ptr<cuda_jacobi_solver> cu_jac_solver;
 static std::vector<Eigen::Vector3d> trajectory;
 
 #define CLEAR_TRAJECTORY(trac) \
@@ -85,8 +87,10 @@ int proj_dyn_spring_solver::precompute() {
   LHS_.resize(dim_, dim_);
   LHS_.reserve(trips.size());
   LHS_.setFromTriplets(trips.begin(), trips.end());
+  LHS_.makeCompressed();
   solver_.compute(LHS_);
   ASSERT(solver_.info() == Success);
+  cu_jac_solver = make_shared<cuda_jacobi_solver>(LHS_);
   cout << "......done\n";
   return 0;
 }
@@ -110,19 +114,6 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-
-  const size_t aux_dim = fms->aux_dim();
-  static size_t frame = 0;
-  char xout[256], bout[256];
-  sprintf(xout, "./proj_dyn/compare_trajectory/x_seq_frame_%zu.dat", frame);
-  sprintf(bout, "./proj_dyn/compare_trajectory/b_seq_frame_%zu.dat", frame);
-  ofstream osx(xout, ios::binary), osb(bout, ios::binary);
-  frame++;
-  osx.write((char *)&dim_, sizeof(size_t));          // write x dimension
-  osx.write((char *)&args_.maxiter, sizeof(size_t));
-  osb.write((char *)&aux_dim, sizeof(size_t));       // write d dimension
-  osb.write((char *)&args_.maxiter, sizeof(size_t));
-
   // iterate solve
   CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
@@ -133,7 +124,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
     }
     fms->LocalSolve(&xstar[0]);
     {
-      const size_t eid = 1000;
+      const size_t eid = 2000;
       Vector3d edge(fms->get_aux_var()+3*eid);
       trajectory.push_back(edge);
     }
@@ -141,12 +132,6 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
       impE_->Gra(&xstar[0], &jac[0]);
       jac *= -1;
     }
-    /// @@ dump x and d @@
-    {
-      osx.write((char *)&xstar[0], dim_*sizeof(double));
-      osb.write((char *)fms->get_aux_var(), aux_dim*sizeof(double));
-    }
-    /// @@ end dump @@
     double curr_jac_norm = jac.norm();
     if ( curr_jac_norm <= args_.eps ) {
       cout << "\t@CONVERGED after " << iter << " iterations\n";
@@ -241,7 +226,11 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
     dx.setZero();
+#ifdef USE_CUDA
+    cu_jac_solver->apply(jac, dx);
+#else
     apply_jacobi(LHS_, jac, dx);
+#endif
     double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
