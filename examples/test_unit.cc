@@ -13,6 +13,7 @@
 #include <omp.h>
 #include <Eigen/Geometry>
 #include <unsupported/Eigen/MatrixFunctions>
+#include <time.h>
 
 #include "src/mass_matrix.h"
 #include "src/config.h"
@@ -212,6 +213,8 @@ int test_cuda_jacobi(ptree &pt) {
   VectorXd x = VectorXd::Random(dim);
 
   shared_ptr<cuda_jacobi_solver> solver = make_shared<cuda_jacobi_solver>(M);
+  time_t start, end;
+  start = clock();
   if ( pt.get<int>("method.value") == 0 ) {
     for (size_t i = 0; i < pt.get<int>("maxiter.value"); ++i)
       solver->apply(b, x);
@@ -219,6 +222,8 @@ int test_cuda_jacobi(ptree &pt) {
     for (size_t i = 0; i < pt.get<int>("maxiter.value"); ++i)
       apply_jacobi(M, b, x);
   }
+  end = clock();
+  printf("time: %lf\n", (double)(end-start)/CLOCKS_PER_SEC);
 
   cout << "residual: " << (b-M*x).lpNorm<Infinity>() << endl;
   return 0;

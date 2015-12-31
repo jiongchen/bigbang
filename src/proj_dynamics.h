@@ -33,6 +33,8 @@ struct proj_dyn_args {
   double wp;  // for position
 };
 
+class cuda_jacobi_solver;
+
 class proj_dyn_spring_solver
 {
 public:
@@ -64,6 +66,8 @@ private:
 
   const size_t dim_;
   Eigen::SparseMatrix<double, Eigen::RowMajor> LHS_;
+  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> ldlt_solver_;
+  std::shared_ptr<cuda_jacobi_solver> jac_solver_;
 };
 
 class proj_dyn_tet_solver
@@ -92,6 +96,7 @@ private:
 
   const size_t dim_;
   Eigen::SparseMatrix<double, Eigen::RowMajor> LHS_;
+  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> ldlt_solver_;
 };
 
 }

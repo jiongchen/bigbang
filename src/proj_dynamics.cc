@@ -20,12 +20,10 @@ using namespace zjucad::matrix;
 
 namespace bigbang {
 
-static Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver_;
-static std::shared_ptr<cuda_jacobi_solver> cu_jac_solver;
 static std::vector<Eigen::Vector3d> trajectory;
 
 #define CLEAR_TRAJECTORY(trac) \
-  trajectory.clear();
+  trac.clear();
 
 proj_dyn_spring_solver::proj_dyn_spring_solver(const mati_t &tris, const matd_t &nods)
   : tris_(tris), nods_(nods), dim_(nods.size()) {
@@ -88,9 +86,9 @@ int proj_dyn_spring_solver::precompute() {
   LHS_.reserve(trips.size());
   LHS_.setFromTriplets(trips.begin(), trips.end());
   LHS_.makeCompressed();
-  solver_.compute(LHS_);
-  ASSERT(solver_.info() == Success);
-  cu_jac_solver = make_shared<cuda_jacobi_solver>(LHS_);
+  ldlt_solver_.compute(LHS_);
+  ASSERT(ldlt_solver_.info() == Success);
+  jac_solver_ = make_shared<cuda_jacobi_solver>(LHS_);
   cout << "......done\n";
   return 0;
 }
@@ -140,7 +138,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    xstar += solver_.solve(jac);
+    xstar += ldlt_solver_.solve(jac);
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -181,7 +179,7 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    dx = solver_.solve(jac);
+    dx = ldlt_solver_.solve(jac);
     double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
@@ -227,7 +225,7 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
     }
     dx.setZero();
 #ifdef USE_CUDA
-    cu_jac_solver->apply(jac, dx);
+    jac_solver_->apply(jac, dx);
 #else
     apply_jacobi(LHS_, jac, dx);
 #endif
@@ -398,7 +396,7 @@ int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    xstar += solver_.solve(jac);
+    xstar += ldlt_solver_.solve(jac);
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -446,6 +444,7 @@ int proj_dyn_spring_solver::draw_trajectory(const char *filename) const {
   point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
   return 0;
 }
+
 //====================== tetrahedral projective solver =========================
 proj_dyn_tet_solver::proj_dyn_tet_solver(const mati_t &tets, const matd_t &nods)
   : tets_(tets), nods_(nods), dim_(nods.size()) {}
@@ -495,8 +494,8 @@ int proj_dyn_tet_solver::precompute() {
   LHS_.resize(dim_, dim_);
   LHS_.reserve(trips.size());
   LHS_.setFromTriplets(trips.begin(), trips.end());
-  solver_.compute(LHS_);
-  ASSERT(solver_.info() == Success);
+  ldlt_solver_.compute(LHS_);
+  ASSERT(ldlt_solver_.info() == Success);
   cout << "......done\n";
   return 0;
 }
@@ -549,7 +548,7 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
       cout << "\t@spectral radius: " << curr_jac_norm/prev_jac_norm << endl << endl;
     }
     prev_jac_norm = curr_jac_norm;
-    xstar += solver_.solve(jac);
+    xstar += ldlt_solver_.solve(jac);
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
@@ -584,7 +583,7 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
     if ( iter % 10 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl << endl;
     }
-    dx = solver_.solve(jac);
+    dx = ldlt_solver_.solve(jac);
     double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;

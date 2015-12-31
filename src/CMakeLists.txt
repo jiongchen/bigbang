@@ -28,7 +28,7 @@ add_custom_command(OUTPUT stvk_hess_stiff_tensor.f90
 add_subdirectory(HLBFGS)
 
 if(CUDA_FOUND)
-    cuda_add_library(cu-jacobi SHARED jacobi.cu)
+    cuda_add_library(cu-jacobi SHARED jacobi_kernel.cu)
     set(CU_JACOBI_LIBRARY cu-jacobi)
 else(CUDA_FOUND)
     set(CU_JACOBI_LIBRARY "")
