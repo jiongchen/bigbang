@@ -42,4 +42,5 @@ target_link_libraries(bigbang
     ${LBFGS_LIBRARIES}
     ${ARPACK_LIBRARIES}
     ${CU_JACOBI_LIBRARY}
+    ann-parallel
 )

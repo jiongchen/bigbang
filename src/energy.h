@@ -319,6 +319,22 @@ private:
   matd_t invUV_;
 };
 
+class low_pass_filter_energy : public Functional<double>
+{
+public:
+  low_pass_filter_energy(const mati_t &tris, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void Update(const double *ref);
+private:
+  const size_t dim_;
+  double w_;
+  const mati_t &tris_;
+  const matd_t ref_;
+};
+
 }
 
 #endif

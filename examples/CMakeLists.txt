@@ -85,3 +85,15 @@ target_link_libraries(test_proj_dyn_tet
 )
 
 add_executable(bin_reader bin_reader.cc)
+
+add_executable(test_quasi_static test_quasi_static.cc)
+target_link_libraries(test_quasi_static
+    bigbang
+    ${Boost_LIBRARIES}
+)
+
+add_executable(test_emb_thin_shell test_emb_thin_shell.cc)
+target_link_libraries(test_emb_thin_shell
+    bigbang
+    ${Boost_LIBRARIES}
+)

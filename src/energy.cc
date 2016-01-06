@@ -627,7 +627,7 @@ int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
       matd_t g = zeros<double>(6, 1);
       double energy = 0;
       mass_spring_(&energy, &vert[0], &len_[i]);
-      if ( false /*energy < 1e-16*/ ) {
+      if ( energy < 1e-16 ) {
         calc_edge_length_jac_(&g[0], &vert[0]);
         g /= sqrt(len_[i]);
       } else {
