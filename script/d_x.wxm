@@ -6,51 +6,55 @@ load(cj_function);
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-load(f90);
+d(x) := r*(col(x,1)-col(x,2))/NORM(col(x,1)-col(x,2));
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-d(x,r) := block(
-    [edge],
-    edge: col(x,1)-col(x,2),
-    r*edge/NORM(edge)
-);
+X: genmatrix(X, 3, 2);
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-X: matrix([a1, b1], [a2, b2], [a3, b3]);
+J: GRAD(d(X), X);
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
-val: d(X, r);
-/* [wxMaxima: input   end   ] */
-
-/* [wxMaxima: input   start ] */
-matrix_size(val);
-/* [wxMaxima: input   end   ] */
-
-/* [wxMaxima: input   start ] */
-jac: GRAD(val, X);
-/* [wxMaxima: input   end   ] */
-
-/* [wxMaxima: input   start ] */
-matrix_size(jac);
-/* [wxMaxima: input   end   ] */
-
-/* [wxMaxima: input   start ] */
-f90(optimize(FLATTEN(val)));
-/* [wxMaxima: input   end   ] */
-
-/* [wxMaxima: input   start ] */
-f90(optimize(FLATTEN(jac)));
-/* [wxMaxima: input   end   ] */
-
-/* [wxMaxima: input   start ] */
-res: transpose(jac).(col(X, 1)-col(X, 2)-d(X, r));
+res: transpose(J).(col(X,1)-col(X,2)-d(X));
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
 ratsimp(res);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+S: matrix([1,0,0,-1,0,0], [0,1,0,0,-1,0], [0,0,1,0,0,-1]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+GRAD(transpose(S).d(X), X)-transpose(J).S;
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+JtJ: transpose(J).J;
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(JtJ);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+JtS: transpose(J).S;
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(JtS);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+transpose(JtS)-JtS;
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+determinant(JtS);
 /* [wxMaxima: input   end   ] */
 
 /* Maxima can't load/batch files which end with a comment! */

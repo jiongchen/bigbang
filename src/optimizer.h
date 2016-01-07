@@ -27,7 +27,7 @@ int newton_solve_with_constrained_dofs(double *x, const size_t dim, const pfunc 
 
 int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args &args);
 
-int constrained_newton_solve(double *x, const size_t dim, const pfunc &f, const pcons &c);
+int constrained_newton_solve(double *x, const size_t dim, const pfunc &f, const pcons &c, const opt_args &args);
 
 int gauss_newton_solve(double *x, const size_t dim, const pcons &f);
 

@@ -37,15 +37,7 @@ int proj_dyn_spring_solver::initialize(const proj_dyn_args &args) {
 
   impebf_.resize(6);
   impebf_[0] = make_shared<momentum_potential_imp_euler>(tris_, nods_, args_.rho, args_.h);
-  switch ( args_.method ) {
-    case 0: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
-    case 1: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
-    case 2: impebf_[1] = make_shared<modified_fms_energy>(edges_, nods_, args_.ws); break;
-    case 3: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
-    case 4: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
-    case 5: impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws); break;
-    default: break;
-  }
+  impebf_[1] = make_shared<fast_mass_spring>(edges_, nods_, args_.ws);
   impebf_[2] = make_shared<positional_potential>(nods_, args_.wp);
   impebf_[3] = make_shared<gravitational_potential>(tris_, nods_, args_.rho, args_.wg);
   impebf_[4] = make_shared<ext_force_energy>(nods_, 1e0);
@@ -312,47 +304,43 @@ int proj_dyn_spring_solver::advance_beta(double *x) const { /// @brief Kovalsky1
 //  return 0;
 }
 
-int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified, fail
+int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified
   ASSERT(args_.method == 2);
-  return __LINE__;
-//  Map<VectorXd> X(x, dim_);
-//  VectorXd xstar = X;
-//  const auto fms = dynamic_pointer_cast<modified_fms_energy>(impebf_[1]);
-//  VectorXd prev_step, next_step;
-//  const static SparseMatrix<double>& S = fms->get_df_mat();
-//  // iterate solve
-//  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-//    if ( iter % 100 == 0 ) {
-//      double value = 0;
-//      impE_->Val(&xstar[0], &value);
-//      cout << "\t@iter " << iter << " energy value: " << value << endl;
-//    }
-//    // local step for constraint projection
-//    fms->LocalSolve(&xstar[0]);
-//    prev_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
-//    // global step for compatible position
-//    VectorXd jac = VectorXd::Zero(dim_); {
-//      impE_->Gra(&xstar[0], &jac[0]);
-//    }
-//    VectorXd dx = -solver_.solve(jac);
-//    double xstar_norm = xstar.norm();
-//    xstar += dx;
-//    next_step = S*xstar-Map<const VectorXd>(fms->get_aux_var(), fms->aux_dim());
-//    if ( iter < 5 ) {
-//      cout << "\t@prev step size: " << prev_step.norm() << endl;
-//      cout << "\t@post step size: " << next_step.norm() << endl;
-//      cout << "\t@dx norm: " << dx.norm() << endl;
-//      cout << "\t@turning angle: " << acos(prev_step.dot(next_step)/(prev_step.norm()*next_step.norm()))/M_PI*180 << endl << endl;
-//    }
-//    if ( dx.norm() <= args_.eps*xstar_norm ) {
-//      cout << "[info] converged after " << iter+1 << " iterations\n";
-//      break;
-//    }
-//  }
-//  // update configuration
-//  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
-//  X = xstar;
-//  return 0;
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X;
+  const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  VectorXd prev_dx = VectorXd::Zero(dim_);
+  // iterate solve
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 1000 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    fms->LocalSolve(&xstar[0]);
+    VectorXd jac = VectorXd::Zero(dim_); {
+      impE_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
+    SparseMatrix<double> JTS;
+    fms->getJTS(&xstar[0], JTS);
+    jac += JTS*prev_dx;
+    VectorXd dx = ldlt_solver_.solve(jac);
+    xstar += dx;
+    prev_dx = dx;
+  }
+  // update configuration
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
 }
 
 int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO

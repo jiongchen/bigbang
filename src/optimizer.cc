@@ -128,7 +128,6 @@ int newton_solve_with_constrained_dofs(double *x, const size_t dim, const pfunc 
         rhs = value+h*0.45*(grad.dot(Dx));
       } while ( lhs >= value && h > 1e-12 );
     }
-
     xstar += h*Dx;
     if ( h*Dx.norm() <= args.eps*xstar_norm ) {
       cout << "\t@CONVERGED after " << iter << " iterations\n\n";
@@ -183,36 +182,48 @@ int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args &arg
   return 0;
 }
 
-//int constrained_newton_solve(double *x, const size_t dim, pfunc &f, const pcons &c) {
-//  if ( dim != f->Nx() || dim != c->Nx() ) {
-//    cerr << "[error] dim not match\n";
-//    return __LINE__;
-//  }
-//  const size_t fdim = c->Nf();
-//  UmfPackLU<SparseMatrix<double>> sol;
-//  VectorXd X = VectorXd::Zero(dim+fdim);
-//  std::copy(x, x+dim, X.data());
-//  VectorXd xprev = X.head(dim);
-//  for (size_t iter = 0; iter < MAX_ITER; ++iter) {
-//    VectorXd rhs(dim+fdim); {
-//      rhs.setZero();
-//      f->Gra(&X[0], &rhs[0]);
-//      c->Val(&X[0], &rhs[dim]);
-//    }
-//    SparseMatrix<double> LHS(dim+fdim, dim+fdim); {
-//      vector<Triplet<double>> trips;
-//      f->Hes(&X[0], &trips);
-//      const auto begin = trips.end();
-//      c->Jac(&X[0], dim, &trips);
-//      const auto end = trips.end();
-//      for (auto it = begin; it != end; ++it) {
+int constrained_newton_solve(double *x, const size_t dim, pfunc &f, const pcons &c, const opt_args &args) {
+  if ( dim != f->Nx() || dim != c->Nx() ) {
+    cerr << "[error] dim not match\n";
+    return __LINE__;
+  }
+  const size_t fdim = c->Nf();
+  SimplicialCholesky<SparseMatrix<double>> solver;
+  solver.setMode(SimplicialCholeskyLDLT);
 
-//      }
-//    }
-//  }
-//  std::copy(X.data(), X.data()+dim, x);
-//  return 0;
-//}
+  VectorXd xstar = VectorXd::Zero(dim+fdim);
+  std::copy(x, x+dim, xstar.data());
+  VectorXd xprev = xstar.head(dim);
+  for (size_t iter = 0; iter < args.max_iter; ++iter) {
+    VectorXd rhs(dim+fdim); {
+      rhs.setZero();
+      f->Gra(&xstar[0], &rhs[0]);
+      c->Val(&xstar[0], &rhs[dim]);
+    }
+    SparseMatrix<double> LHS(dim+fdim, dim+fdim); {
+      vector<Triplet<double>> trips;
+      f->Hes(&xstar[0], &trips);
+      const auto begin = trips.end();
+      c->Jac(&xstar[0], dim, &trips);
+      const auto end = trips.end();
+      for (auto it = begin; it != end; ++it) {
+
+      }
+    }
+    solver.compute(LHS);
+    ASSERT(solver.info() == Success);
+    VectorXd dx = solver.solve(rhs);
+    ASSERT(solver.info() == Success);
+    xstar += dx;
+    if ( (xstar.head(dim)-xprev).norm() <= args.eps*xstar.head(dim).norm() ) {
+      cout << "\t@CONVERGED";
+      break;
+    }
+    xprev = xstar.head(dim);
+  }
+  std::copy(xstar.data(), xstar.data()+dim, x);
+  return 0;
+}
 
 //int gauss_newton_solve(double *x, const size_t dim, const pcons &f) {
 //  if ( dim != f->Nx() ) {

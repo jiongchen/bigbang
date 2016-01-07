@@ -13,4 +13,4 @@ elif [ ! -e "$mesh" ]; then
   exit 1
 fi
 
-time $exe -i $mesh -c $cons -o ../build/bin/proj_dyn/chebyshev -t 0.033 --wb 0.001 --method $1 -m 25000 -n $2
+time $exe -i $mesh -c $cons -o ../build/bin/proj_dyn/JTS -t 0.033 --wb 0.001 --method $1 -m 25000 -n $2
