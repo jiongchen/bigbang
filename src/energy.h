@@ -322,7 +322,7 @@ private:
 class low_pass_filter_energy : public Functional<double>
 {
 public:
-  low_pass_filter_energy(const mati_t &tris, const matd_t &nods, const double w);
+  low_pass_filter_energy(const mati_t &tris, const matd_t &nods, const size_t patch_num, const double w);
   size_t Nx() const;
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
@@ -331,8 +331,10 @@ public:
 private:
   const size_t dim_;
   double w_;
+  const size_t patch_num_;
   const mati_t &tris_;
-  const matd_t ref_;
+  const double *ref_;
+  std::vector<std::vector<std::pair<size_t, double>>> pat_;
 };
 
 }

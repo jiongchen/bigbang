@@ -92,8 +92,7 @@ void shrink_surface(const mati_t &tris, matd_t &nods, const double dist) {
   nods -= dist*normal;
 }
 
-void subdivide_surface(const mati_t &tris, const matd_t &nods,
-                       mati_t &ftris, matd_t &fnods) {
+void subdivide_surface(const mati_t &tris, const matd_t &nods, mati_t &ftris, matd_t &fnods) {
   using jtf::mesh::edge2cell_adjacent;
   unique_ptr<edge2cell_adjacent> e2c(edge2cell_adjacent::create(tris, false));
   ftris.resize(3, 4 * tris.size(2));
@@ -135,8 +134,7 @@ int interp_pts_in_tets(const matd_t &v, const mati_t &tet, const matd_t &pts, cs
   const size_t tn = tet.size(2), pn = pts.size(2);
 
   vector<double*> pv(tn);
-  matrix<double> tet_center(3, tn);
-  {
+  matrix<double> tet_center(3, tn); {
     for(int i = 0; i < tn; ++i) {
       tet_center(colon(), i) = v(colon(), tet(colon(), i))*ones<double>(4, 1)/4;
       pv[i] = &tet_center(0, i);
@@ -144,8 +142,7 @@ int interp_pts_in_tets(const matd_t &v, const mati_t &tet, const matd_t &pts, cs
   }
 
   auto_ptr<ANNkd_tree> kdt(new ANNkd_tree(&pv[0], tn, v.size(1), 32));
-  matrix<matrix<double> > bary_op(tn);
-  {
+  matrix<matrix<double> > bary_op(tn); {
     for(int i = 0; i < tn; ++i) {
       matrix<double> v44 = ones<double>(4, 4);
       for(int j = 0; j < 4; ++j)
@@ -165,6 +162,7 @@ int interp_pts_in_tets(const matd_t &v, const mati_t &tet, const matd_t &pts, cs
   matrix<int> idx(max_k);
   double min_good = 1;
   int outside_cnt = 0;
+
   for(int pi = 0; pi < pn; ++pi) {
     if((pi%1000) == 0)
       cerr << "process " << pi << endl;
@@ -172,8 +170,7 @@ int interp_pts_in_tets(const matd_t &v, const mati_t &tet, const matd_t &pts, cs
     pt = pts(colon(), pi);
     pair<int, double> best_t(-1, -10);
 
-    for(int ki = 0, k = ave_k; ki < iter_n && k < max_k; ++ki, k*=2)
-    {
+    for(int ki = 0, k = ave_k; ki < iter_n && k < max_k; ++ki, k*=2) {
       if(k > max_k)
         k = max_k;
       const double r2 = 1e1;

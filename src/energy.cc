@@ -12,6 +12,7 @@
 #include "config.h"
 #include "geom_util.h"
 #include "util.h"
+#include "mesh_partition.h"
 
 using namespace std;
 using namespace zjucad::matrix;
@@ -72,6 +73,8 @@ void bw98_shear_hes_(double *hes, const double *x, const double *invUV, const do
 void line_bending_(double *val, const double *x, const double *d1, const double *d2);
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
 void line_bending_hes_(double *hes, const double *x, const double *d1, const double *d2);
+
+}
 
 typedef double scalarD;
 void const_len_spring(double *out, const double *x, const double *l0) {
@@ -162,8 +165,6 @@ void const_len_spring_jac(double *out, const double *x, const double *l0) {
   out[15]=tt16;
   out[16]=tt17;
   out[17]=tt8*tt6*r+tt14;
-}
-
 }
 
 void tet_corotational_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
@@ -1265,6 +1266,91 @@ int bw98_shear_energy::Hes(const double *x, vector<Triplet<double>> *hes) const 
     }
   }
   return 0;
+}
+//==============================================================================
+low_pass_filter_energy::low_pass_filter_energy(const mati_t &tris, const matd_t &nods, const size_t patch_num, const double w)
+  : dim_(nods.size()), w_(w), tris_(tris), patch_num_(patch_num) {
+  mesh_partition mp(tris, nods);
+  vector<ptn_to_patch> info;
+  mp.init(info);
+  mp.run(patch_num_, info);
+  // allocate patches
+  pat_.resize(mp.get_actual_patch_num());
+  for (size_t i = 0; i < info.size(); ++i) {
+    pat_[info[i].id_patch].push_back(make_pair(i, info[i].dist));
+  }
+  // calc coef
+  double sigma = 10;//2*()*pow(1, 1.0/3);
+#pragma omp parallel for
+  for (size_t i = 0; i < pat_.size(); ++i) {
+    double sum = 0;
+    for (size_t j = 0; j < pat_[i].size(); ++j) {
+      double d = pat_[i][j].second;
+      if ( d < 2*sigma )
+        pat_[i][j].second = exp(-0.5*d*d/(sigma*sigma));
+      else
+        pat_[i][j].second = 0;
+      sum += pat_[i][j].second;
+    }
+    for (size_t j = 0; j < pat_[i].size(); ++j) {
+      pat_[i][j].second /= sum;
+    }
+  }
+}
+
+size_t low_pass_filter_energy::Nx() const {
+  return dim_;
+}
+
+int low_pass_filter_energy::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  Map<const MatrixXd> X(x, 3, dim_/3);
+  Map<const MatrixXd> Q(ref_, 3, dim_/3);
+  for (auto &arr : pat_) {
+    Vector3d lhs = Vector3d::Zero(), rhs = Vector3d::Zero();
+    for (auto &elem: arr) {
+      const size_t pi = elem.first;
+      lhs += elem.second*X.col(pi);
+      rhs += elem.second*Q.col(pi);
+    }
+    *val += 0.5*w_*(lhs-rhs).squaredNorm();
+  }
+  return 0;
+}
+
+int low_pass_filter_energy::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  Map<const MatrixXd> X(x, 3, dim_/3);
+  Map<const MatrixXd> Q(ref_, 3, dim_/3);
+  Map<MatrixXd> G(gra, 3, dim_/3);
+  for (auto &arr : pat_) {
+    Vector3d lhs = Vector3d::Zero(), rhs = Vector3d::Zero();
+    for (auto &elem : arr) {
+      const size_t pi = elem.first;
+      lhs += elem.second*X.col(pi);
+      rhs += elem.second*Q.col(pi);
+    }
+    for (auto &elem : arr) {
+      G.col(elem.first) += w_*elem.second*(lhs-rhs);
+    }
+  }
+  return 0;
+}
+
+int low_pass_filter_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  for (auto &arr : pat_) {
+    for (size_t i = 0; i < arr.size(); ++i) {
+      for (size_t j = 0; j < arr.size(); ++j) {
+        add_diag_block<double, 3>(arr[i].first, arr[j].first, w_*arr[i].second*arr[j].second, hes);
+      }
+    }
+  }
+  return 0;
+}
+
+void low_pass_filter_energy::Update(const double *ref) {
+  ref_ = ref;
 }
 //==============================================================================
 }

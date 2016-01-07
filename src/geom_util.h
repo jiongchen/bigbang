@@ -24,15 +24,9 @@ void extract_tet_surface(const mati_t &tets, const matd_t &nods, mati_t &tris, m
 
 void shrink_surface(const mati_t &tris, matd_t &nods, const double dist);
 
-void subdivide_surface(const mati_t &tris, const matd_t &nods, const mati_t &out_tris, matd_t &out_nods);
+void subdivide_surface(const mati_t &tris, const matd_t &nods, mati_t &out_tris, matd_t &out_nods);
 
 int interp_pts_in_tets(const matd_t &v, const mati_t &tet, const matd_t &pts, csc_t &coef);
-
-struct partition_info {
-  size_t cid;
-  size_t pid;
-  double d;
-};
 
 }
 #endif

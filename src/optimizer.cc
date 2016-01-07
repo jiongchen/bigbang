@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "def.h"
+#include "util.h"
 #include "HLBFGS/HLBFGS.h"
 #include "HLBFGS/Lite_Sparse_Matrix.h"
 
@@ -34,7 +35,7 @@ int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &ar
     VectorXd grad = VectorXd::Zero(dim); {
       f->Gra(&xstar[0], &grad[0]);
       if ( grad.norm() <= args.eps ) {
-        cout << "\t@gradient converged\n\n";
+        cout << "\t@GRADIENT CONVERGED\n\n";
         break;
       }
     }
@@ -64,7 +65,73 @@ int newton_solve(double *x, const size_t dim, const pfunc &f, const opt_args &ar
     }
     xstar += h*dx;
     if ( h*dx.norm() <= args.eps*xstar_norm ) {
-      cout << "[info] converged after " << iter << " iterations\n\n";
+      cout << "\t@CONVERGED after " << iter << " iterations\n\n";
+      break;
+    }
+  }
+  X = xstar;
+  return 0;
+}
+
+int newton_solve_with_constrained_dofs(double *x, const size_t dim, const pfunc &f, const vector<size_t> &g2l, const opt_args &args) {
+  if ( dim != f->Nx() ) {
+    cerr << "[error] dim not match\n";
+    return __LINE__;
+  }
+  SimplicialCholesky<SparseMatrix<double>> sol;
+  sol.setMode(SimplicialCholeskyLDLT);
+  Map<VectorXd> X(x, dim);
+  VectorXd xstar = X, dx, Dx(dim);
+  for (size_t iter = 0; iter < args.max_iter; ++iter) {
+    double value = 0; {
+      f->Val(&xstar[0], &value);
+      if ( iter % 100 == 0 ) {
+        cout << "\t@iter " << iter << endl;
+        cout << "\t@energy value: " << value << endl;
+      }
+    }
+    VectorXd grad = VectorXd::Zero(dim); {
+      f->Gra(&xstar[0], &grad[0]);
+      grad *= -1.0;
+      if ( grad.norm() <= args.eps ) {
+        cout << "\t@GRADIENT CONVERGED\n\n";
+        break;
+      }
+    }
+    SparseMatrix<double> H(dim, dim); {
+      vector<Triplet<double>> trips;
+      f->Hes(&xstar[0], &trips);
+      H.reserve(trips.size());
+      H.setFromTriplets(trips.begin(), trips.end());
+    }
+
+    rm_spmat_col_row(H, g2l);
+    rm_vector_row(grad, g2l);
+    sol.compute(H);
+    ASSERT(sol.info() == Success);
+    dx = sol.solve(grad);
+    ASSERT(sol.info() == Success);
+    Dx.setZero();
+    rc_vector_row(dx, g2l, Dx);
+
+    double xstar_norm = xstar.norm();
+    double h = 1.0;
+    // line search here
+    if ( args.lineseach ) {
+      h /= 0.5;
+      VectorXd xnew(dim);
+      double lhs = 0.0, rhs = 0.0;
+      do {
+        h *= 0.5;
+        xnew = xstar+h*Dx;
+        f->Val(&xnew[0], &lhs);
+        rhs = value+h*0.45*(grad.dot(Dx));
+      } while ( lhs >= value && h > 1e-12 );
+    }
+
+    xstar += h*Dx;
+    if ( h*Dx.norm() <= args.eps*xstar_norm ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n\n";
       break;
     }
   }
