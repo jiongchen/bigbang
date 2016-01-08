@@ -239,72 +239,64 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
 
 int proj_dyn_spring_solver::advance_beta(double *x) const { /// @brief Kovalsky15
   ASSERT(args_.method == 1);
-  return __LINE__;
-//  Map<VectorXd> X(x, dim_);
-//  auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-//  const size_t fdim = fms->aux_dim();
+  Map<VectorXd> X(x, dim_);
+  auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
+  const size_t fdim = fms->aux_dim();
 
-//  VectorXd xstar = X, jac(dim_), eta(dim_);
-//  VectorXd z(fdim), n(fdim);
-//  Map<const VectorXd> Pz(fms->get_aux_var(), fdim);
-//  double d0 = 0;
-//  const SparseMatrix<double>& S = fms->get_df_mat();
-//  VectorXd next_step(fdim);
+  VectorXd xstar = X, jac(dim_), eta(dim_);
+  VectorXd z(fdim), n(fdim);
+  Map<const VectorXd> Pz(fms->get_aux_var(), fdim);
+  double d0 = 0;
+  const SparseMatrix<double>& S = fms->get_df_mat();
+  VectorXd next_step(fdim);
 
-//  // iterative solve
-//  VectorXd unkown(dim_+1), inve(dim_), invb(dim_);
-//  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-//    if ( iter % 100 == 0 ) {
-//      double value = 0;
-//      impE_->Val(&xstar[0], &value);
-//      cout << "\t@iter " << iter << " energy value: " << value << endl;
-//    }
-//    // local solve
-//    z = S*xstar;
-//    fms->LocalSolve(&xstar[0]);
-//    n = z-Pz;
-//    if ( iter % 100 == 0 ) {
-//      cout << "\t@iter " << iter << " normal: " << n.norm() << endl << endl;
-//    }
-//    // global solve
-//    jac.setZero(); {
-//      impE_->Gra(&xstar[0], &jac[0]);
-//      jac *= -1;
-//    }
-//    eta = S.transpose()*n;
-//    d0 = n.dot(Pz-z);
+  // iterative solve
+  VectorXd unkown(dim_+1), inve(dim_), invb(dim_);
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 1000 == 0 ) {
+      double value = 0;
+      impE_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    z = S*xstar;
+    fms->LocalSolve(&xstar[0]);
+    n = z-Pz;
+    jac.setZero(); {
+      impE_->Gra(&xstar[0], &jac[0]);
+      jac *= -1;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 1000 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+    }
 
-//    invb = solver_.solve(jac);
-//    ASSERT(solver_.info() == Success);
-//    inve = solver_.solve(eta);
-//    ASSERT(solver_.info() == Success);
+    eta = S.transpose()*n;
+    d0 = n.dot(Pz-z);
 
-//    if ( n.norm() < args_.eps ) {
-//      unkown.head(dim_) = invb;
-//    } else {
-//      unkown[unkown.size()-1] = (-d0+eta.dot(invb))/eta.dot(inve);
-//      unkown.head(dim_) = invb-unkown[unkown.size()-1]*inve;
-//    }
-//    double xstar_norm = xstar.norm();
-//    xstar += unkown.head(dim_);
-//    next_step = S*xstar-Pz;
-//    if ( iter < 5 ) {
-//      cout << "\t@prev step size: " << n.norm() << endl;
-//      cout << "\t@post step size: " << next_step.norm() << endl;
-//      cout << "\t@dx norm: " << unkown.head(dim_).norm() << endl;
-//      cout << "\t@turning angle: " << acos(n.dot(next_step)/(n.norm()*next_step.norm()))/M_PI*180 << "\n\n";
-//    }
-//    if ( unkown.head(dim_).norm() <= args_.eps*xstar_norm ) {
-//      cout << "[info] converged after " << iter+1 << " iterations\n";
-//      break;
-//    }
-//  }
-//  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
-//  X = xstar;
-//  return 0;
+    invb = ldlt_solver_.solve(jac);
+    ASSERT(ldlt_solver_.info() == Success);
+    inve = ldlt_solver_.solve(eta);
+    ASSERT(ldlt_solver_.info() == Success);
+
+    if ( n.norm() < args_.eps ) {
+      unkown.head(dim_) = invb;
+    } else {
+      unkown[unkown.size()-1] = (-d0+eta.dot(invb))/eta.dot(inve);
+      unkown.head(dim_) = invb-unkown[unkown.size()-1]*inve;
+    }
+    xstar += unkown.head(dim_);
+    next_step = S*xstar-Pz;
+  }
+  dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
+  X = xstar;
+  return 0;
 }
 
-int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified
+int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
   ASSERT(args_.method == 2);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -343,7 +335,7 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief modified
   return 0;
 }
 
-int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief TODO
+int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief Chebyshev on $d$
   ASSERT(args_.method == 3);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
@@ -494,6 +486,7 @@ int proj_dyn_tet_solver::advance(double *x) const {
     case 0: rtn = advance_alpha(x); break;
     case 1: rtn = advance_beta(x); break;
     case 2: rtn = advance_gamma(x); break;
+    case 3: rtn = advance_delta(x); break;
     default: return __LINE__;
   }
   return rtn;
@@ -550,7 +543,7 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
   const size_t S = 10;
-  const double rho = 0.87375, gamma = 0.75;
+  const double rho = 0.78, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
@@ -630,6 +623,11 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
   }
   dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
   X = xstar;
+  return 0;
+}
+
+int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on R
+  ASSERT(args_.method == 3);
   return 0;
 }
 

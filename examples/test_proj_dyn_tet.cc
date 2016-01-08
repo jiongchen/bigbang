@@ -18,6 +18,7 @@ namespace test_proj_dyn_tet {
 struct argument {
   string input_mesh;
   string input_cons;
+  string input_handle;
   string output_folder;
   size_t total_frame;
   proj_dyn_args proj_args;
@@ -43,6 +44,7 @@ int main(int argc, char *argv[])
       ("help,h", "produce help message")
       ("input_mesh,i", po::value<string>(), "set the input mesh")
       ("input_cons,c", po::value<string>(), "set the input positional constraints")
+      ("input_handle,f", po::value<string>(), "set the handles")
       ("output_folder,o", po::value<string>(), "set the output folder")
       ("total_frame,n", po::value<size_t>()->default_value(300), "set the frame number")
       ("method", po::value<int>()->default_value(0), "choose the method")
@@ -64,6 +66,7 @@ int main(int argc, char *argv[])
   test_proj_dyn_tet::argument args; {
     args.input_mesh = vm["input_mesh"].as<string>();
     args.input_cons = vm["input_cons"].as<string>();
+    args.input_handle = vm["input_handle"].as<string>();
     args.output_folder = vm["output_folder"].as<string>();
     args.total_frame = vm["total_frame"].as<size_t>();
     args.proj_args.rho = vm["density"].as<double>();
@@ -82,8 +85,9 @@ int main(int argc, char *argv[])
   // load input
   mati_t tets; matd_t nods;
   jtf::mesh::tet_mesh_read_from_zjumat(args.input_mesh.c_str(), &nods, &tets);
-  vector<size_t> fixed;
+  vector<size_t> fixed, driver;
   read_fixed_verts(args.input_cons.c_str(), fixed);
+  read_fixed_verts(args.input_handle.c_str(), driver);
 
   // init the solver
   proj_dyn_tet_solver solver(tets, nods);
@@ -96,8 +100,8 @@ int main(int argc, char *argv[])
   // precompute
   solver.precompute();
 
+  const double intensity = 60;
   char outfile[256];
-  double f[3] = {-200, 0, -200};
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
     sprintf(outfile, "%s/frame_method%d_ws%.1e_wg%.1e_wp%.1e_m%zu_%zu.vtk",
@@ -105,6 +109,21 @@ int main(int argc, char *argv[])
             args.proj_args.wg, args.proj_args.wp, args.proj_args.maxiter, i);
     ofstream os(outfile);
     tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
+
+    matd_t n = cross(nods(colon(), 306)-nods(colon(), 307), nods(colon(), 301)-nods(colon(), 306));
+    matd_t o = (nods(colon(), 306)+nods(colon(), 307)+nods(colon(), 301))*ones<double>(3, 1)/3.0;
+    // apply twist
+    if ( i < 100 ) {
+      for (auto &pi : driver) {
+        matd_t force = cross(n, nods(colon(), pi)-o);
+        force = intensity*force/norm(force);
+        APPLY_FORCE(i, pi, &force[0]);
+      }
+    }
+    // release twist
+    for (auto &pi : driver) {
+      REMOVE_FORCE(100, pi);
+    }
 
     solver.advance(&nods[0]);
 

@@ -1,9 +1,10 @@
 #!/bin/bash
 
 exe=../build/bin/test_proj_dyn_tet
-mesh=../dat/beam.tet
-cons=../dat/beam_fixed.fv
-outfolder=../build/bin/proj_dyn/arap
+mesh=../dat/beam_dense.tet
+cons=../dat/beam_dense_fixed.fv
+driv=../dat/beam_dense_handle.fv
+outfolder=../build/bin/proj_dyn/arap/dense
 
 if [ ! -e "$exe" ]; then
   echo executable binary not exists!
@@ -13,4 +14,4 @@ elif [ ! -e "$mesh" ]; then
   exit 1
 fi
 
-time $exe -i $mesh -c $cons -o $outfolder -t 0.033 --method 0 -m 25000 -n 30
+time $exe -i $mesh -c $cons -f $driv -o $outfolder --method $2 -m 25000 -n $1 --ws 2000 --wg 0.0

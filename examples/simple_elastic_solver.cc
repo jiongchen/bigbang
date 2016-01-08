@@ -35,9 +35,15 @@ struct argument {
 };
 }
 
-//#define IMPL_EULER
+#define APPLY_FORCE(frame, id, f)                                       \
+  if ( i == frame )                                                     \
+    dynamic_pointer_cast<ext_force_energy>(ebf[4])->ApplyForce(id, f);
 
-static opt_args optparam = {10000, 1e-8, false};
+#define REMOVE_FORCE(frame, id)                                         \
+  if ( i == frame )                                                     \
+    dynamic_pointer_cast<ext_force_energy>(ebf[4])->RemoveForce(id);
+
+static opt_args optparam = {10000, 1e-8, true};
 
 int main(int argc, char *argv[])
 {
@@ -92,30 +98,27 @@ int main(int argc, char *argv[])
   read_fixed_verts(args.input_cons.c_str(), fixed);
 
   // assemble energies
-  vector<shared_ptr<Functional<double>>> ebf(4);
+  vector<shared_ptr<Functional<double>>> ebf(5);
   shared_ptr<Functional<double>> energy;
-#ifdef IMPL_EULER
   ebf[0] = make_shared<momentum_potential_imp_euler>(tets, nods, args.density, args.timestep, 1e0);
-#else
-  ebf[0] = make_shared<momentum_potential_bdf2>(tets, nods, args.density, args.timestep, 1e0);
-#endif
-  ebf[1] = make_shared<elastic_potential>(tets, nods, elastic_potential::STVK,
-                                          args.young_modulus, args.poisson_ratio, args.we);
+  ebf[1] = make_shared<elastic_potential>(tets, nods, elastic_potential::STVK, args.young_modulus, args.poisson_ratio, args.we);
   ebf[2] = make_shared<gravitational_potential>(tets, nods, args.density, args.wg);
   ebf[3] = make_shared<positional_potential>(nods, args.wp);
+  ebf[4] = make_shared<ext_force_energy>(nods, 1e0);
   try {
     energy = make_shared<energy_t<double>>(ebf);
   } catch ( exception &e ) {
     cerr << e.what() << endl;
     exit(EXIT_FAILURE);
   }
-
-//  vector<shared_ptr<Constraint<double>>> cbf(1);
-//  shared_ptr<Constraint<double>> constraint;
-
   // boudary conditions
   for (auto &elem : fixed)
     dynamic_pointer_cast<positional_potential>(ebf[3])->Pin(elem, &nods(0, elem));
+
+  const vector<size_t> driver{149, 150, 151, 152,
+                             153, 154, 155, 156, 157, 158, 159, 160,
+                             161, 162, 163, 164, 165, 166, 167};
+  const double intensity = 35;
 
   char outfile[256];
   for (size_t i = 0; i < args.total_frame; ++i) {
@@ -124,8 +127,22 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
 
-//    newton_solve(&nods[0], nods.size(), energy, optparam);
-    lbfgs_solve(&nods[0], nods.size(), energy, optparam);
+    matd_t n = cross(nods(colon(), 167)-nods(colon(), 166), nods(colon(), 161)-nods(colon(), 167));
+    matd_t o = (nods(colon(), 167)+nods(colon(), 166)+nods(colon(), 161))*ones<double>(3, 1)/3.0;
+    // apply twist
+    if ( i < 80 ) {
+      for (auto &pi : driver) {
+        matd_t force = cross(n, nods(colon(), pi)-o);
+        force = intensity*force/norm(force);
+        APPLY_FORCE(i, pi, &force[0]);
+      }
+    }
+    // release twist
+    for (auto &pi : driver) {
+      REMOVE_FORCE(80, pi);
+    }
+
+    newton_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }
 
