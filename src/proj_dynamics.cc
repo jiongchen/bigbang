@@ -542,8 +542,8 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
-  const size_t S = 10;
-  const double rho = 0.78, gamma = 0.75;
+  static const size_t S = 10;
+  static const double rho = 0.78, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
@@ -586,8 +586,8 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X, prev_xstar = xstar, dx(dim_), curr_xstar(dim_);
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
-  const size_t S = 10;
-  const double rho = 0.87375, gamma = 0.75;
+  static const size_t S = 10;
+  static const double rho = 0.78, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
@@ -628,6 +628,50 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
 
 int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on R
   ASSERT(args_.method == 3);
+  Map<VectorXd> X(x, dim_);
+  VectorXd xstar = X, jac = VectorXd::Zero(dim_);
+  const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
+  VectorXd aux, prev_aux, curr_aux;
+  arap->CalcLieAlgebraCoord(prev_aux);
+  static const size_t S = 10;
+  static const double rho = 0.78, gamma = 0.75;
+  // iterations
+  for (size_t iter = 0; iter < args_.maxiter; ++iter) {
+    if ( iter % 10 == 0 ) {
+      double value = 0;
+      energy_->Val(&xstar[0], &value);
+      cout << "\t@iter " << iter << " energy value: " << value << endl;
+    }
+    arap->CalcLieAlgebraCoord(curr_aux);
+    arap->LocalSolve(&xstar[0]);
+    arap->CalcLieAlgebraCoord(aux);
+    double omega;
+    if ( iter < S )
+      omega = 0.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    aux = omega*(gamma*(aux-curr_aux)+curr_aux-prev_aux)+prev_aux;
+    arap->UpdateRotation(aux);
+    prev_aux = curr_aux;
+    jac.setZero(); {
+      energy_->Gra(&xstar[0], &jac[0]);
+      jac *= -1.0;
+    }
+    double curr_jac_norm = jac.norm();
+    if ( curr_jac_norm <= args_.eps ) {
+      cout << "\t@CONVERGED after " << iter << " iterations\n";
+      break;
+    }
+    if ( iter % 10 == 0 ) {
+      cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl;
+    }
+    xstar += ldlt_solver_.solve(jac);
+  }
+  // update dynamical configuration
+  dynamic_pointer_cast<momentum_potential>(ebf_[0])->Update(&xstar[0]);
+  X = xstar;
   return 0;
 }
 

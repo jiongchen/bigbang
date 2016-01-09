@@ -6,6 +6,7 @@
 #include <zjucad/matrix/itr_matrix.h>
 #include <zjucad/matrix/io.h>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <unsupported/Eigen/MatrixFunctions>
 #include <jtflib/mesh/util.h>
 
 #include "mass_matrix.h"
@@ -1051,6 +1052,32 @@ void tet_arap_energy::LocalSolve(const double *x) {
     Map<Matrix3d> F(df.begin());
     JacobiSVD<Matrix3d> svd(F, ComputeFullU|ComputeFullV);
     Map<Matrix3d>(&R_(0, i)) = svd.matrixU()*svd.matrixV().transpose();
+  }
+}
+
+void tet_arap_energy::CalcLieAlgebraCoord(VectorXd &vec) const {
+  vec.setZero(3*tets_.size(2));
+#pragma omp parallel for
+  for (size_t i = 0; i < R_.size(2); ++i) {
+    Matrix3d logR = Matrix3d(&R_(0, i)).log();
+    vec[3*i+0] = -logR(1, 2);
+    vec[3*i+1] = logR(0, 2);
+    vec[3*i+2] = -logR(0, 1);
+  }
+}
+
+void tet_arap_energy::UpdateRotation(const VectorXd &vec) {
+#pragma omp parallel for
+  for (size_t i = 0; i < R_.size(2); ++i) {
+    Matrix3d logR = Matrix3d::Zero();
+    logR(0, 1) = -vec[3*i+2];
+    logR(0, 2) = vec[3*i+1];
+    logR(1, 2) = -vec[3*i+0];
+    logR(1, 0) = -logR(0, 1);
+    logR(2, 0) = -logR(0, 2);
+    logR(2, 1) = -logR(1, 2);
+    Matrix3d rot = logR.exp();
+    std::copy(rot.data(), rot.data()+rot.size(), &R_(0, i));
   }
 }
 //==============================================================================

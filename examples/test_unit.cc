@@ -162,10 +162,11 @@ int test_mat_add_scalar(ptree &pt) {
 }
 
 int test_matrix_log(ptree &pt) {
+  srand(time(NULL));
   Vector3d axis = Vector3d::Random();
   axis /= axis.norm();
   cout << "axis:\n" << axis << endl << endl;
-  double angle = 2.0;
+  double angle = 1.0;
   cout << "angle:\n" << angle << endl << endl;
   Matrix3d rot = AngleAxisd(angle, axis).toRotationMatrix();
   cout << "log(R):\n" << rot.log() << endl << endl;

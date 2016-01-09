@@ -257,6 +257,8 @@ public:
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
   void LocalSolve(const double *x);
+  void CalcLieAlgebraCoord(Eigen::VectorXd &vec) const;
+  void UpdateRotation(const Eigen::VectorXd &vec);
   size_t aux_dim() const { return 9*tets_.size(2); }
   const double* get_aux_var() const { return R_.begin(); }
 private:
