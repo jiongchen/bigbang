@@ -14,4 +14,5 @@ elif [ ! -e "$mesh" ]; then
   exit 1
 fi
 
-time $exe -i $mesh -c $cons -f $driv -o $outfolder --method $2 -m 25000 -n $1 --ws 2000 --wg 0.0
+# twist the beam without gravity exerted
+time $exe -i $mesh -c $cons -f $driv -o $outfolder --method $1 -m 25000 -n 100 --ws 2000 --wg 0.0 --spectral_radius 0.78

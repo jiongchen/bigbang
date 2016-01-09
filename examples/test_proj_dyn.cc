@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
       ("output_folder,o", po::value<string>(), "set the output folder")
       ("total_frame,n", po::value<size_t>()->default_value(300), "set the frame number")
       ("method", po::value<int>()->default_value(0), "choose the method")
+      ("spectral_radius", po::value<double>()->default_value(0.0), "set the spectral radius")
       ("density,d", po::value<double>()->default_value(1.0), "set the density")
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
@@ -71,6 +72,7 @@ int main(int argc, char *argv[])
     args.proj_args.h = vm["timestep"].as<double>();
     args.proj_args.maxiter = vm["maxiter"].as<size_t>();
     args.proj_args.method = vm["method"].as<int>();
+    args.proj_args.sr = vm["spectral_radius"].as<double>();
     args.proj_args.eps = vm["tolerance"].as<double>();
     args.proj_args.ws = vm["ws"].as<double>();
     args.proj_args.wb = vm["wb"].as<double>();
@@ -108,9 +110,9 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
 
-    APPLY_FORCE(0, 3, f);
-    REMOVE_FORCE(40, 3);
-    RELEASE_VERT(160, 2);
+//    APPLY_FORCE(0, 3, f);
+//    REMOVE_FORCE(40, 3);
+//    RELEASE_VERT(160, 2);
 
     solver.advance(&nods[0]);
 

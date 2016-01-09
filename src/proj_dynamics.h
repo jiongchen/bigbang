@@ -26,6 +26,7 @@ struct proj_dyn_args {
   double rho, h;
   size_t maxiter;
   int method;
+  double sr;  // spectral radius
   double eps;
   double ws;  // for stretch
   double wb;  // for bending

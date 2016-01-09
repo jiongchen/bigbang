@@ -80,7 +80,9 @@ int proj_dyn_spring_solver::precompute() {
   LHS_.makeCompressed();
   ldlt_solver_.compute(LHS_);
   ASSERT(ldlt_solver_.info() == Success);
+#ifdef USE_CUDA
   jac_solver_ = make_shared<cuda_jacobi_solver>(LHS_);
+#endif
   cout << "......done\n";
   return 0;
 }
@@ -144,7 +146,7 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   const size_t S = 10;
-  const double rho = 0.9992, gamma = 0.75;
+  const double rho = args_.sr, gamma = 0.75;
   // iterative solve
   CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
@@ -194,7 +196,7 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   const size_t S = 10;
-  const double rho = 0.9992, gamma = 0.75;
+  const double rho = args_.sr, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
@@ -343,7 +345,7 @@ int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief Chebyshe
   Map<VectorXd> aux_var(fms->d_.begin(), fms->d_.size());
   VectorXd prev_aux_var = aux_var, curr_aux_var(fms->aux_dim());
   const size_t S = 10;
-  const double rho = 0.9992, gamma = 0.75;
+  const double rho = args_.sr, gamma = 0.75;
   // iterate solve
   CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
@@ -543,7 +545,7 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
   static const size_t S = 10;
-  static const double rho = 0.78, gamma = 0.75;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
@@ -587,7 +589,7 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
   VectorXd xstar = X, prev_xstar = xstar, dx(dim_), curr_xstar(dim_);
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
   static const size_t S = 10;
-  static const double rho = 0.78, gamma = 0.75;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterative solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
@@ -634,7 +636,7 @@ int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on
   VectorXd aux, prev_aux, curr_aux;
   arap->CalcLieAlgebraCoord(prev_aux);
   static const size_t S = 10;
-  static const double rho = 0.78, gamma = 0.75;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterations
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
