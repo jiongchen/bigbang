@@ -231,6 +231,27 @@ int test_cuda_jacobi(ptree &pt) {
 }
 #endif
 
+int test_matrix_log2(ptree &pt) {
+  Vector3d a(-0.112034, -0.223533, 3.78475);
+  cout << a.transpose() << endl;
+  cout << "angle: " << a.norm()/M_PI*180 << endl;
+  cout << "axis: " << a.normalized().transpose() << endl << endl;
+  Matrix3d logR;
+  logR(0, 1) = -a[2];
+  logR(0, 2) = a[1];
+  logR(1, 2) = -a[0];
+  logR(1, 0) = -logR(0, 1);
+  logR(2, 0) = -logR(0, 2);
+  logR(2, 1) = -logR(1, 2);
+  Matrix3d R = logR.exp();
+  Matrix3d la = R.log();
+  Vector3d b(-la(1, 2), la(0, 2), -la(0, 1));
+  cout << b.transpose() << endl;
+  cout << "angle: " << b.norm()/M_PI*180 << endl;
+  cout << "axis: " << b.normalized().transpose() << endl;
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -246,6 +267,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_matrix_log);
     CALL_SUB_PROG(test_iterative_solve);
     CALL_SUB_PROG(test_cuda_jacobi);
+    CALL_SUB_PROG(test_matrix_log2);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);

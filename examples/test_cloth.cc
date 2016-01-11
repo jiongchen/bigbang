@@ -134,9 +134,9 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
 
-    APPLY_FORCE(0, 3, f);
-    REMOVE_FORCE(40, 3);
-    RELEASE_VERT(160, 2);
+//    APPLY_FORCE(0, 3, f);
+//    REMOVE_FORCE(40, 3);
+//    RELEASE_VERT(160, 2);
 
     newton_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);

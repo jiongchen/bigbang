@@ -175,7 +175,7 @@ public:
   size_t aux_dim() const { return 3*edge_.size(2); }
   const double* get_aux_var() const { return d_.begin(); }
   const Eigen::SparseMatrix<double>& get_df_mat() const { return S_; }
-  void getJTS(const double *x, Eigen::SparseMatrix<double> &JTS) const;
+  void getJTS(const double *x, Eigen::SparseMatrix<double, Eigen::RowMajor> &JTS) const;
 public:
   const mati_t &edge_;
   matd_t len_;
@@ -261,12 +261,14 @@ public:
   void UpdateRotation(const Eigen::VectorXd &vec);
   size_t aux_dim() const { return 9*tets_.size(2); }
   const double* get_aux_var() const { return R_.begin(); }
+public:
+  matd_t R_;
 private:
   const size_t dim_;
   double w_;
   const mati_t &tets_;
   matd_t vol_;
-  matd_t R_, D_;
+  matd_t D_;
 };
 
 class bw98_stretch_energy : public Functional<double>

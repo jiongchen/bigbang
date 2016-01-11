@@ -10,7 +10,35 @@ d(x) := r*(col(x,1)-col(x,2))/NORM(col(x,1)-col(x,2));
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
+E(x) := 1/2*(col(x,1)-col(x,2)-d(x)).(col(x,1)-col(x,2)-d(x));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
 X: genmatrix(X, 3, 2);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+energy_value: E(X);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+energy_grad: GRAD(energy_value, X);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+matrix_size(energy_grad);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+simp_energy_grad: ratsimp(energy_grad);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+energy_hessian: GRAD(simp_energy_grad, X);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+simp_energy_hessian: ratsimp(energy_hessian);
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */
@@ -27,6 +55,18 @@ ratsimp(res);
 
 /* [wxMaxima: input   start ] */
 S: matrix([1,0,0,-1,0,0], [0,1,0,0,-1,0], [0,0,1,0,0,-1]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(transpose(S).(col(X,1)-col(X,2)-d(X))-transpose(simp_energy_grad));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(transpose(S).S-transpose(J).S-simp_energy_hessian);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(transpose(S).S-transpose(S).J-simp_energy_hessian);
 /* [wxMaxima: input   end   ] */
 
 /* [wxMaxima: input   start ] */

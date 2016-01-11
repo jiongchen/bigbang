@@ -733,7 +733,7 @@ void fast_mass_spring::Project() {
   }
 }
 
-void fast_mass_spring::getJTS(const double *x, SparseMatrix<double> &JTS) const {
+void fast_mass_spring::getJTS(const double *x, SparseMatrix<double, RowMajor> &JTS) const {
   itr_matrix<const double *> X(3, dim_/3, x);
   vector<Triplet<double>> trips;
   matd_t S(3, 6);

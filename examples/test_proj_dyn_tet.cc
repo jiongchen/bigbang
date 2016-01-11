@@ -112,9 +112,9 @@ int main(int argc, char *argv[])
     ofstream os(outfile);
     tet2vtk(os, &nods[0], nods.size(2), &tets[0], tets.size(2));
 
+    // apply twist
     matd_t n = cross(nods(colon(), 306)-nods(colon(), 307), nods(colon(), 301)-nods(colon(), 306));
     matd_t o = (nods(colon(), 306)+nods(colon(), 307)+nods(colon(), 301))*ones<double>(3, 1)/3.0;
-    // apply twist
     if ( i < 100 ) {
       for (auto &pi : driver) {
         matd_t force = cross(n, nods(colon(), pi)-o);

@@ -306,8 +306,8 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
   VectorXd prev_dx = VectorXd::Zero(dim_);
   // iterate solve
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
-    if ( iter % 1000 == 0 ) {
-      double value = 0;
+    double value = 0;
+    if ( iter % 10 == 0 ) {
       impE_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
@@ -321,15 +321,36 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
       cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
-    if ( iter % 1000 == 0 ) {
+    if ( iter % 10 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-    SparseMatrix<double> JTS;
-    fms->getJTS(&xstar[0], JTS);
-    jac += JTS*prev_dx;
-    VectorXd dx = ldlt_solver_.solve(jac);
-    xstar += dx;
-    prev_dx = dx;
+//    SparseMatrix<double, RowMajor> JTS;
+//    fms->getJTS(&xstar[0], JTS);
+//    SparseMatrix<double> temp = LHS_-JTS;
+//    SparseMatrix<double> I(dim_, dim_);
+//    I.setIdentity();
+//    temp += 1e-8*I;
+//    ldlt_solver_.compute(temp);
+//    //jac += JTS*prev_dx;
+//    VectorXd dx = ldlt_solver_.solve(jac);
+//    // line search
+//    double h = 1.0;
+//    h /= 0.5;
+//    VectorXd xnew(dim_);
+//    double lhs = 0.0, rhs = 0.0;
+//    do {
+//      h *= 0.5;
+//      xnew = xstar+h*dx;
+//      impE_->Val(&xnew[0], &lhs);
+//      rhs = value+h*0.45*(-jac.dot(dx));
+//    } while ( lhs >= value && h > 1e-12 );
+//    if ( iter % 10 == 0 ) {
+//      cout << "\tstep size: " << h << endl;
+//    }
+//    xstar += h*dx;
+
+//    xstar += dx;
+//    prev_dx = dx;
   }
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
@@ -494,16 +515,14 @@ int proj_dyn_tet_solver::advance(double *x) const {
   return rtn;
 }
 
-static std::vector<Eigen::Vector3d> lie_pts;
-
 int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
   ASSERT(args_.method == 0);
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto arap = dynamic_pointer_cast<tet_arap_energy>(ebf_[1]);
-  lie_pts.clear();
   // iterate solve
   double prev_jac_norm = -1;
+  CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
       double value = 0;
@@ -512,10 +531,10 @@ int proj_dyn_tet_solver::advance_alpha(double *x) const { /// @brief Direct
     }
     arap->LocalSolve(&xstar[0]);
     {
-      const size_t tid = 5;
+      const size_t tid = 3599;
       Matrix3d R(arap->get_aux_var()+9*tid);
       Matrix3d logR = R.log();
-      lie_pts.push_back(Vector3d(logR(2, 1), logR(0, 2), logR(1, 0)));
+      trajectory.push_back(Vector3d(logR(2, 1), logR(0, 2), logR(1, 0)));
     }
     VectorXd jac = VectorXd::Zero(dim_); {
       energy_->Gra(&xstar[0], &jac[0]);
@@ -564,7 +583,7 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
       break;
     }
     if ( iter % 10 == 0 ) {
-      cout << "\t@iter " << iter << " error: " << jac.norm() << endl << endl;
+      cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl << endl;
     }
     dx = ldlt_solver_.solve(jac);
     double omega;
@@ -608,7 +627,7 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
       break;
     }
     if ( iter % 10 == 0 ) {
-      cout << "\t@iter " << iter << " error: " << jac.norm() << endl << endl;
+      cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl << endl;
     }
     dx.setZero();
     apply_jacobi(LHS_, jac, dx);
@@ -649,7 +668,7 @@ int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on
     arap->CalcLieAlgebraCoord(aux);
     double omega;
     if ( iter < S )
-      omega = 0.0;
+      omega = 1.0;
     else if ( iter == S )
       omega = 2.0/(2.0-rho*rho);
     else
@@ -667,7 +686,7 @@ int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on
       break;
     }
     if ( iter % 10 == 0 ) {
-      cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl;
+      cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl << endl;
     }
     xstar += ldlt_solver_.solve(jac);
   }
@@ -682,13 +701,13 @@ void proj_dyn_tet_solver::vis_rot(const char *filename) const {
     return;
   cout << "[info] visualize the rotation in log space\n";
   vector<double> pts;
-  for (size_t i = 0; i < lie_pts.size(); ++i) {
-    pts.push_back(lie_pts[i].x());
-    pts.push_back(lie_pts[i].y());
-    pts.push_back(lie_pts[i].z());
+  for (size_t i = 0; i < trajectory.size(); ++i) {
+    pts.push_back(trajectory[i].x());
+    pts.push_back(trajectory[i].y());
+    pts.push_back(trajectory[i].z());
   }
   ofstream os(filename);
-  mati_t p = colon(0, lie_pts.size()-1);
+  mati_t p = colon(0, trajectory.size()-1);
   point2vtk(os, &pts[0], pts.size()/3, p.begin(), p.size());
 }
 
