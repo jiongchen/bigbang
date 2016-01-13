@@ -145,10 +145,11 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  const size_t S = 10;
-  const double rho = args_.sr, gamma = 0.75;
+  static const size_t S = 10;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterative solve
   CLEAR_TRAJECTORY(trajectory);
+  double omega;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
       double value = 0;
@@ -174,7 +175,6 @@ int proj_dyn_spring_solver::advance_zeta(double *x) const { /// @brief Direct+Ch
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
     dx = ldlt_solver_.solve(jac);
-    double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
     else if ( iter == S )
@@ -195,9 +195,10 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_), dx(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  const size_t S = 10;
-  const double rho = args_.sr, gamma = 0.75;
+  static const size_t S = 10;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterative solve
+  double omega;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
       double value = 0;
@@ -223,7 +224,6 @@ int proj_dyn_spring_solver::advance_epsilon(double *x) const { /// @brief Jacobi
 #else
     apply_jacobi(LHS_, jac, dx);
 #endif
-    double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
     else if ( iter == S )
@@ -365,10 +365,11 @@ int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief Chebyshe
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   Map<VectorXd> aux_var(fms->d_.begin(), fms->d_.size());
   VectorXd prev_aux_var = aux_var, curr_aux_var(fms->aux_dim());
-  const size_t S = 10;
-  const double rho = args_.sr, gamma = 0.75;
+  static const size_t S = 10;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterate solve
   CLEAR_TRAJECTORY(trajectory);
+  double omega;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
       double value = 0;
@@ -377,7 +378,6 @@ int proj_dyn_spring_solver::advance_delta(double *x) const { /// @brief Chebyshe
     }
     curr_aux_var = aux_var;
     fms->LocalSolve(&xstar[0]);
-    double omega;
     if ( iter < S )
       omega = 1.0;
     else if ( iter == S )
@@ -566,6 +566,7 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
   static const size_t S = 10;
   static const double rho = args_.sr, gamma = 0.75;
   // iterative solve
+  double omega;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
       double value = 0;
@@ -586,7 +587,6 @@ int proj_dyn_tet_solver::advance_beta(double *x) const { /// @brief Direct+Cheby
       cout << "\t@iter " << iter << " error: " << curr_jac_norm << endl << endl;
     }
     dx = ldlt_solver_.solve(jac);
-    double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
     else if ( iter == S )
@@ -610,6 +610,7 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
   static const size_t S = 10;
   static const double rho = args_.sr, gamma = 0.75;
   // iterative solve
+  double omega;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
       double value = 0;
@@ -631,7 +632,6 @@ int proj_dyn_tet_solver::advance_gamma(double *x) const { /// @brief Jacobi+Cheb
     }
     dx.setZero();
     apply_jacobi(LHS_, jac, dx);
-    double omega;
     if ( iter < S ) // delay the chebyshev iteration
       omega = 1.0;
     else if ( iter == S )
@@ -657,6 +657,7 @@ int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on
   static const size_t S = 10;
   static const double rho = args_.sr, gamma = 0.75;
   // iterations
+  double omega;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 10 == 0 ) {
       double value = 0;
@@ -666,7 +667,6 @@ int proj_dyn_tet_solver::advance_delta(double *x) const { ///@brief Chebyshev on
     arap->CalcLieAlgebraCoord(curr_aux);
     arap->LocalSolve(&xstar[0]);
     arap->CalcLieAlgebraCoord(aux);
-    double omega;
     if ( iter < S )
       omega = 1.0;
     else if ( iter == S )
