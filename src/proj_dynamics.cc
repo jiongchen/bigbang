@@ -13,6 +13,7 @@
 #include "vtk.h"
 #include "optimizer.h"
 #include "jacobi.h"
+#include "timer.h"
 
 using namespace std;
 using namespace Eigen;
@@ -83,6 +84,7 @@ int proj_dyn_spring_solver::precompute() {
 #ifdef USE_CUDA
   jac_solver_ = make_shared<cuda_jacobi_solver>(LHS_);
 #endif
+  dynamic_pointer_cast<fast_mass_spring>(impebf_[1])->build_jts_pattern();
   cout << "......done\n";
   return 0;
 }
@@ -303,11 +305,13 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
   Map<VectorXd> X(x, dim_);
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
-  VectorXd prev_dx = VectorXd::Zero(dim_);
+  VectorXd dx = VectorXd::Zero(dim_), rhs(dim_);
   // iterate solve
+  static high_resolution_timer timer;
+  double t_asm = 0.0, t_solve = 0.0;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     double value = 0;
-    if ( iter % 10 == 0 ) {
+    if ( iter % 1000 == 0 ) {
       impE_->Val(&xstar[0], &value);
       cout << "\t@iter " << iter << " energy value: " << value << endl;
     }
@@ -321,37 +325,26 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
       cout << "\t@CONVERGED after " << iter << " iterations\n";
       break;
     }
-    if ( iter % 10 == 0 ) {
+    if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
-//    SparseMatrix<double, RowMajor> JTS;
-//    fms->getJTS(&xstar[0], JTS);
-//    SparseMatrix<double> temp = LHS_-JTS;
-//    SparseMatrix<double> I(dim_, dim_);
-//    I.setIdentity();
-//    temp += 1e-8*I;
-//    ldlt_solver_.compute(temp);
-//    //jac += JTS*prev_dx;
-//    VectorXd dx = ldlt_solver_.solve(jac);
-//    // line search
-//    double h = 1.0;
-//    h /= 0.5;
-//    VectorXd xnew(dim_);
-//    double lhs = 0.0, rhs = 0.0;
-//    do {
-//      h *= 0.5;
-//      xnew = xstar+h*dx;
-//      impE_->Val(&xnew[0], &lhs);
-//      rhs = value+h*0.45*(-jac.dot(dx));
-//    } while ( lhs >= value && h > 1e-12 );
-//    if ( iter % 10 == 0 ) {
-//      cout << "\tstep size: " << h << endl;
-//    }
-//    xstar += h*dx;
 
-//    xstar += dx;
-//    prev_dx = dx;
+    timer.start();
+    SparseMatrix<double> &JTS = fms->get_jts(&xstar[0]);
+    timer.stop();
+    t_asm += timer.duration();
+
+    timer.start();
+    for (size_t k = 0; k < 3; ++k) {
+      rhs = jac+JTS*dx;
+      dx = ldlt_solver_.solve(rhs);
+    }
+    timer.stop();
+    t_solve += timer.duration();
+
+    xstar += dx;
   }
+  cout << "\t@TIME RATIO assemble/solve: " << t_asm/t_solve << endl;
   // update configuration
   dynamic_pointer_cast<momentum_potential>(impebf_[0])->Update(&xstar[0]);
   X = xstar;

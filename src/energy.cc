@@ -733,30 +733,54 @@ void fast_mass_spring::Project() {
   }
 }
 
-void fast_mass_spring::getJTS(const double *x, SparseMatrix<double, RowMajor> &JTS) const {
-  itr_matrix<const double *> X(3, dim_/3, x);
+void fast_mass_spring::build_jts_pattern() {
   vector<Triplet<double>> trips;
-  matd_t S(3, 6);
-  S(colon(), colon(0, 2)) = eye<double>(3);
-  S(colon(), colon(3, 5)) = -eye<double>(3);
   for (size_t i = 0; i < edge_.size(2); ++i) {
-    matd_t vert = X(colon(), edge_(colon(), i));
-    matd_t J = zeros<double>(3, 6);
-    const_len_spring_jac(&J[0], &vert[0], &len_[i]);
-    matd_t jts = trans(J)*S;
     for (size_t p = 0; p < 6; ++p) {
       for (size_t q = 0; q < 6; ++q) {
-        if ( jts(p, q) != 0.0 ) {
-          const size_t I = 3*edge_(p/3, i)+p%3;
-          const size_t J = 3*edge_(q/3, i)+q%3;
-          trips.push_back(Triplet<double>(I, J, w_*jts(p, q)));
+        const size_t I = 3*edge_(p/3, i)+p%3;
+        const size_t J = 3*edge_(q/3, i)+q%3;
+        trips.push_back(Triplet<double>(I, J, 0.0));
+      }
+    }
+  }
+  JtS_.resize(dim_, dim_);
+  JtS_.setFromTriplets(trips.begin(), trips.end());
+  JtS_.makeCompressed();
+  // J^TS is column major
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    for (size_t p = 0; p < 6; ++p) {
+      for (size_t q = 0; q < 6; ++q) {
+        const size_t I = 3*edge_(p/3, i)+p%3;
+        const size_t J = 3*edge_(q/3, i)+q%3;
+        for (size_t cnt = JtS_.outerIndexPtr()[J]; cnt < JtS_.outerIndexPtr()[J+1]; ++cnt) {
+          if ( JtS_.innerIndexPtr()[cnt] == I )
+            ijp_.insert(make_pair(make_pair(I, J), cnt));
         }
       }
     }
   }
-  JTS.resize(dim_, dim_);
-  JTS.reserve(trips.size());
-  JTS.setFromTriplets(trips.begin(), trips.end());
+}
+
+SparseMatrix<double>& fast_mass_spring::get_jts(const double *x) {
+  itr_matrix<const double *> X(3, dim_/3, x);
+  std::fill(JtS_.valuePtr(), JtS_.valuePtr()+JtS_.nonZeros(), 0.0);
+  for (size_t i = 0; i < edge_.size(2); ++i) {
+    matd_t vert = X(colon(), edge_(colon(), i));
+    matd_t J = zeros<double>(3, 6);
+    const_len_spring_jac(&J[0], &vert[0], &len_[i]);
+    matd_t jts(6, 6);
+    jts(colon(), colon(0, 2)) = trans(J);
+    jts(colon(), colon(3, 5)) = -trans(J);
+    for (size_t p = 0; p < 6; ++p) {
+      for (size_t q = 0; q < 6; ++q) {
+        const size_t I = 3*edge_(p/3, i)+p%3;
+        const size_t J = 3*edge_(q/3, i)+q%3;
+        JtS_.valuePtr()[ijp_[make_pair(I, J)]] += w_*jts(p, q);
+      }
+    }
+  }
+  return JtS_;
 }
 //==============================================================================
 surf_bending_potential::surf_bending_potential(const mati_t &diams, const matd_t &nods, const double w)
@@ -916,7 +940,6 @@ int ext_force_energy::RemoveForce(const size_t id) {
   std::fill(&force_[3*id+0], &force_[3*id+3], 0);
   return 0;
 }
-
 //==============================================================================
 line_bending_potential::line_bending_potential(const mati_t &edge, const matd_t &nods, const double w)
   : dim_(nods.size()), w_(w), edge_(edge) {

@@ -162,6 +162,21 @@ private:
   matd_t len_;
 };
 
+template<typename T>
+void hash_combine(size_t &seed, T const &v) {
+  seed ^= std::hash<T>()(v)+0x9e3779b9+(seed<<6)+(seed>>2);
+}
+
+struct pair_hash {
+public:
+  template<typename T, typename U>
+  size_t operator()(const std::pair<T, U> &rhs) const {
+    size_t retval = std::hash<T>()(rhs.first);
+    hash_combine(retval, rhs.second);
+    return retval;
+  }
+};
+
 class fast_mass_spring : public Functional<double>
 {
 public:
@@ -175,7 +190,8 @@ public:
   size_t aux_dim() const { return 3*edge_.size(2); }
   const double* get_aux_var() const { return d_.begin(); }
   const Eigen::SparseMatrix<double>& get_df_mat() const { return S_; }
-  void getJTS(const double *x, Eigen::SparseMatrix<double, Eigen::RowMajor> &JTS) const;
+  void build_jts_pattern();
+  Eigen::SparseMatrix<double>& get_jts(const double *x);
 public:
   const mati_t &edge_;
   matd_t len_;
@@ -183,7 +199,8 @@ public:
 private:
   const size_t dim_;
   double w_;
-  Eigen::SparseMatrix<double> S_;
+  std::unordered_map<std::pair<size_t, size_t>, size_t, pair_hash> ijp_;
+  Eigen::SparseMatrix<double> S_, JtS_;
 };
 
 class line_bending_potential : public Functional<double>
