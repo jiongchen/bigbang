@@ -199,8 +199,8 @@ int test_iterative_solve(ptree &pt) {
   return 0;
 }
 
-#ifdef USE_CUDA
 int test_cuda_jacobi(ptree &pt) {
+#ifdef USE_CUDA
   srand(time(NULL));
   const size_t dim = pt.get<int>("dim.value");
 
@@ -228,8 +228,8 @@ int test_cuda_jacobi(ptree &pt) {
 
   cout << "residual: " << (b-M*x).lpNorm<Infinity>() << endl;
   return 0;
-}
 #endif
+}
 
 int test_matrix_log2(ptree &pt) {
   Vector3d a(-0.112034, -0.223533, 3.78475);

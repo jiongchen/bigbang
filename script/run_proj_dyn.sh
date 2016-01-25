@@ -13,4 +13,7 @@ elif [ ! -e "$mesh" ]; then
   exit 1
 fi
 
-time $exe -i $mesh -c $cons -o $outfolder -t 0.033 --wb 0.01 --method $1 -m 25000 -n 5 --spectral_radius 0.9992
+if [ ! -d "$outfolder" ]; then
+  mkdir -p $outfolder
+fi
+time $exe -i $mesh -c $cons -o $outfolder -t 0.033 --wb 0.01 --method $1 -m 25000 -n 100 --spectral_radius 0.9995

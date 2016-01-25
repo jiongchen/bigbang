@@ -109,6 +109,7 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
   VectorXd xstar = X;
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   // iterate solve
+  double prev_jac_norm = -1;
   CLEAR_TRAJECTORY(trajectory);
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
     if ( iter % 1000 == 0 ) {
@@ -133,7 +134,9 @@ int proj_dyn_spring_solver::advance_alpha(double *x) const { /// @brief Direct
     }
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
+      cout << "\t@spectral radius: " << curr_jac_norm/prev_jac_norm << endl << endl;
     }
+    prev_jac_norm = curr_jac_norm;
     xstar += ldlt_solver_.solve(jac);
   }
   // update configuration
@@ -303,10 +306,13 @@ int proj_dyn_spring_solver::advance_beta(double *x) const { /// @brief Kovalsky1
 int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
   ASSERT(args_.method == 2);
   Map<VectorXd> X(x, dim_);
-  VectorXd xstar = X;
+  VectorXd xstar = X, prev_xstar = xstar, curr_xstar(dim_);
   const auto fms = dynamic_pointer_cast<fast_mass_spring>(impebf_[1]);
   VectorXd dx = VectorXd::Zero(dim_), rhs(dim_);
+  static const size_t S = 10;
+  static const double rho = args_.sr, gamma = 0.75;
   // iterate solve
+  double omega;
   static high_resolution_timer timer;
   double t_asm = 0.0, t_solve = 0.0;
   for (size_t iter = 0; iter < args_.maxiter; ++iter) {
@@ -328,21 +334,31 @@ int proj_dyn_spring_solver::advance_gamma(double *x) const { /// @brief MINE
     if ( iter % 1000 == 0 ) {
       cout << "\t@iter " << iter << " error: " << jac.norm() << endl;
     }
+    if ( iter < S ) {
+      dx = ldlt_solver_.solve(jac);
+    } else {
+      timer.start();
+      SparseMatrix<double> &JTS = fms->get_jts(&xstar[0]);
+      timer.stop();
+      t_asm += timer.duration();
 
-    timer.start();
-    SparseMatrix<double> &JTS = fms->get_jts(&xstar[0]);
-    timer.stop();
-    t_asm += timer.duration();
-
-    timer.start();
-    for (size_t k = 0; k < 3; ++k) {
-      rhs = jac+JTS*dx;
-      dx = ldlt_solver_.solve(rhs);
+      timer.start();
+      for (size_t k = 0; k < 4; ++k) {
+        rhs = jac+JTS*dx;
+        dx = ldlt_solver_.solve(rhs);
+      }
+      timer.stop();
+      t_solve += timer.duration();
     }
-    timer.stop();
-    t_solve += timer.duration();
-
-    xstar += dx;
+    if ( iter < S )
+      omega = 1.0;
+    else if ( iter == S )
+      omega = 2.0/(2.0-rho*rho);
+    else
+      omega = 4.0/(4.0-rho*rho*omega);
+    curr_xstar = xstar;
+    xstar += dx; //omega*(gamma*dx+curr_xstar-prev_xstar)+prev_xstar;
+    prev_xstar = curr_xstar;
   }
   cout << "\t@TIME RATIO assemble/solve: " << t_asm/t_solve << endl;
   // update configuration
