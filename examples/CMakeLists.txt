@@ -97,3 +97,9 @@ target_link_libraries(test_emb_thin_shell
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(read_obj read_obj.cc)
+target_link_libraries(read_obj
+    bigbang
+    ${Boost_LIBRARIES}
+)
