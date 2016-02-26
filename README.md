@@ -14,6 +14,7 @@ This is going to be my spare-time project which will involve implementations of 
 
 - Large Steps in Cloth Simulation
 - Discrete Shells
+- Interactive Virtual Materials
 - Real-Time Subspace Integration for St.Venant-Kirchhoff Deformable Models
 - Efficient Simulation of Inextensible Cloth
 - A Quadratic Bending Model for Inextensible Surfaces

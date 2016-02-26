@@ -252,6 +252,29 @@ int test_matrix_log2(ptree &pt) {
   return 0;
 }
 
+extern "C" {
+void tet_linear_(double *val, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
+void tet_linear_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
+void tet_linear_hes_(double *hes, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu);
+}
+
+int test_constitutive_law(ptree &pt) {
+  srand(time(NULL));
+  matd_t x0 = rand(3, 4);
+  matd_t dm = x0(colon(), colon(1, 3))-x0(colon(), 0)*ones<double>(1, 3);
+  inv(dm);
+
+  double vol = 1.0, lam = 1.0, miu = 1.0;
+  matd_t x = rand(3, 4);
+  matd_t jac(12, 1), hes(12, 12);
+  tet_linear_jac_(&jac[0], &x[0], &dm[0], &vol, &lam, &miu);
+  tet_linear_hes_(&hes[0], &x[0], &dm[0], &vol, &lam, &miu);
+
+  itr_matrix<const double *> X(12, 1, &x[0]), X0(12, 1, &x0[0]);
+  cout << norm(hes*(X-X0)-jac) << endl;
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -268,6 +291,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_iterative_solve);
     CALL_SUB_PROG(test_cuda_jacobi);
     CALL_SUB_PROG(test_matrix_log2);
+    CALL_SUB_PROG(test_constitutive_law);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);

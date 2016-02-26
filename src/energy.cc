@@ -71,6 +71,10 @@ void bw98_shear_(double *val, const double *x, const double *invUV, const double
 void bw98_shear_jac_(double *jac, const double *x, const double *invUV, const double *area);
 void bw98_shear_hes_(double *hes, const double *x, const double *invUV, const double *area);
 
+void fem_stretch_(double *val, const double *x, const double *Dm, const double *area, const double *k);
+void fem_stretch_jac_(double *jac, const double *x, const double *Dm, const double *area, const double *k);
+void fem_stretch_hes_(double *hes, const double *x, const double *Dm, const double *area, const double *k);
+
 void line_bending_(double *val, const double *x, const double *d1, const double *d2);
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
 void line_bending_hes_(double *hes, const double *x, const double *d1, const double *d2);
@@ -166,20 +170,6 @@ void const_len_spring_jac(double *out, const double *x, const double *l0) {
   out[15]=tt16;
   out[16]=tt17;
   out[17]=tt8*tt6*r+tt14;
-}
-
-void tet_corotational_jac_(double *jac, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
-  Map<VectorXd> grad(jac, 3, 4);
-  Map<const MatrixXd> X(x, 3, 4);
-  Map<const Matrix3d> DM(Dm);
-}
-void tet_corotational_hes_(double *hes, const double *x, const double *Dm, const double *vol, const double *lam, const double *miu) {
-  Map<MatrixXd> H(hes, 12, 12);
-  Map<const MatrixXd> X(x, 3, 4);
-  Map<const Matrix3d> DM(Dm);
-  Matrix3d defoGrad = (X.block<3, 3>(1, 3)-X.col(0)*Vector3d::Ones().transpose())*DM;
-  Matrix3d R;
-  MatrixXd Rll = kroneckerProduct(Matrix3d::Identity(), R);
 }
 
 //==============================================================================
@@ -329,7 +319,7 @@ int gravitational_potential::Gra(const double *x, double *gra) const {
 //==============================================================================
 elastic_potential::elastic_potential(const mati_t &tets, const matd_t &nods, Material type,
                                      const double Ym, const double Pr, const double w)
-  : tets_(tets), type_(type), dim_(nods.size()), w_(w) {
+  : tets_(tets), type_(type), dim_(nods.size()), w_(w), rest_(nods) {
   vol_.resize(1, tets_.size(2));
   Dm_.resize(9, tets_.size(2));
 #pragma omp parallel for
@@ -365,6 +355,7 @@ int elastic_potential::Val(const double *x, double *val) const {
         tet_stvk_(&value, &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
         break;
       case COROTATIONAL:
+        value = 0.0;
         break;
       case NEOHOOKEAN:
         tet_neohookean_(&value, &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
@@ -382,8 +373,8 @@ int elastic_potential::Gra(const double *x, double *gra) const {
   itr_matrix<const double *> X(3, dim_/3, x);
   itr_matrix<double *> G(3, dim_/3, gra);
   for (size_t i = 0; i < tets_.size(2); ++i) {
-    matd_t vert = X(colon(), tets_(colon(), i));
-    matd_t grad = zeros<double>(3, 4);
+    matd_t vert = X(colon(), tets_(colon(), i)), x0;
+    matd_t grad = zeros<double>(3, 4), K(12, 12), R = zeros<double>(12, 12);
     switch ( type_ ) {
       case LINEAR:
         tet_linear_jac_(&grad[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
@@ -391,7 +382,19 @@ int elastic_potential::Gra(const double *x, double *gra) const {
       case STVK:
         tet_stvk_jac_(&grad[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
         break;
-      case COROTATIONAL:
+      case COROTATIONAL: {
+          tet_linear_hes_(&K[0], nullptr, &Dm_(0, i), &vol_[i], &lam_, &miu_);
+          matd_t df = (vert(colon(), colon(1, 3))-vert(colon(), 0)*ones<double>(1, 3))*itr_matrix<const double *>(3, 3, &Dm_(0, i));
+          matd_t rot(3, 3);
+          extract_rotation(&df[0], &rot[0]);
+          R(colon(0, 2), colon(0, 2)) = rot;
+          R(colon(3, 5), colon(3, 5)) = rot;
+          R(colon(6, 8), colon(6, 8)) = rot;
+          R(colon(9, 11), colon(9, 11)) = rot;
+        }
+        x0 = rest_(colon(), tets_(colon(), i));
+        itr_matrix<double *>(12, 1, &grad[0])
+            = R*K*(trans(R)*itr_matrix<const double *>(12, 1, &vert[0])-itr_matrix<const double *>(12, 1, &x0[0]));
         break;
       case NEOHOOKEAN:
         tet_neohookean_jac_(&grad[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
@@ -408,7 +411,7 @@ int elastic_potential::Hes(const double *x, vector<Triplet<double>> *hes) const 
   itr_matrix<const double *> X(3, dim_/3, x);
   for (size_t i = 0; i < tets_.size(2); ++i) {
     matd_t vert = X(colon(), tets_(colon(), i));
-    matd_t H = zeros<double>(12, 12);
+    matd_t H = zeros<double>(12, 12), R = zeros<double>(12, 12);
     switch ( type_ ) {
       case LINEAR:
         tet_linear_hes_(&H[0], nullptr, &Dm_(0, i), &vol_[i], &lam_, &miu_);
@@ -416,7 +419,17 @@ int elastic_potential::Hes(const double *x, vector<Triplet<double>> *hes) const 
       case STVK:
         tet_stvk_hes_(&H[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
         break;
-      case COROTATIONAL:
+      case COROTATIONAL: {
+          tet_linear_hes_(&H[0], nullptr, &Dm_(0, i), &vol_[i], &lam_, &miu_);
+          matd_t df = (vert(colon(), colon(1, 3))-vert(colon(), 0)*ones<double>(1, 3))*itr_matrix<const double *>(3, 3, &Dm_(0, i));
+          matd_t rot(3, 3);
+          extract_rotation(&df[0], &rot[0]);
+          R(colon(0, 2), colon(0, 2)) = rot;
+          R(colon(3, 5), colon(3, 5)) = rot;
+          R(colon(6, 8), colon(6, 8)) = rot;
+          R(colon(9, 11), colon(9, 11)) = rot;
+        }
+        H = temp(R*H*trans(R));
         break;
       case NEOHOOKEAN:
         tet_neohookean_(&H[0], &vert[0], &Dm_(0, i), &vol_[i], &lam_, &miu_);
@@ -1261,6 +1274,49 @@ int bw98_shear_energy::Hes(const double *x, vector<Triplet<double>> *hes) const 
         hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
       }
     }
+  }
+  return 0;
+}
+//==============================================================================
+fem_stretch_energy::fem_stretch_energy(const mati_t &tris, const matd_t &nods, const double w)
+  : dim_(nods.size()), w_(w), tris_(tris) {
+
+}
+
+size_t fem_stretch_energy::Nx() const {
+  return dim_;
+}
+
+int fem_stretch_energy::Val(const double *x, double *val) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    double value = 0;
+    fem_stretch_(&value, &vert[0], &Dm_(0, i), &area_[i], &K_(0, i));
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int fem_stretch_energy::Gra(const double *x, double *gra) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  itr_matrix<double *> G(3, dim_/3, gra);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    matd_t vert = X(colon(), tris_(colon(), i));
+    matd_t jac = zeros<double>(3, 3);
+    fem_stretch_jac_(&jac[0], &vert[0], &Dm_(0, i), &area_[i], &K_(0, i));
+    G(colon(), tris_(colon(), i)) += w_*jac;
+  }
+  return 0;
+}
+
+int fem_stretch_energy::Hes(const double *x, vector<Triplet<double>> *hes) const {
+  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  itr_matrix<const double *> X(3, dim_/3, x);
+  for (size_t i = 0; i < tris_.size(2); ++i) {
+    // TODO
   }
   return 0;
 }

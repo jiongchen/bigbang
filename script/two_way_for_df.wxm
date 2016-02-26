@@ -1,0 +1,45 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 13.04.2 ] */
+
+/* [wxMaxima: input   start ] */
+P: matrix([x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3], [1, 1, 1, 1]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+Q: matrix([a0, a1, a2, a3], [b0, b1, b2, b3], [c0, c1, c2, c3], [1, 1, 1, 1]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+X: submatrix(4, P);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+Y: submatrix(4, Q);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+Ds: addcol(col(X,2)-col(X,1), col(X,3)-col(X,1), col(X,4)-col(X,1));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+Dm: addcol(col(Y,2)-col(Y,1), col(Y,3)-col(Y,1), col(Y,4)-col(Y,1));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+df: ratsimp(Ds.invert(Dm));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(P.invert(Q));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+df2: ratsimp(submatrix(4, P.invert(Q), 4));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+df-df2;
+/* [wxMaxima: input   end   ] */
+
+/* Maxima can't load/batch files which end with a comment! */
+"Created with wxMaxima"$

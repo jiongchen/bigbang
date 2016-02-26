@@ -43,7 +43,7 @@ struct argument {
   if ( i == frame )                                                     \
     dynamic_pointer_cast<ext_force_energy>(ebf[4])->RemoveForce(id);
 
-static opt_args optparam = {10000, 1e-8, true};
+static opt_args optparam = {10000, 1e-8, false};
 
 int main(int argc, char *argv[])
 {
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
   vector<shared_ptr<Functional<double>>> ebf(5);
   shared_ptr<Functional<double>> energy;
   ebf[0] = make_shared<momentum_potential_imp_euler>(tets, nods, args.density, args.timestep, 1e0);
-  ebf[1] = make_shared<elastic_potential>(tets, nods, elastic_potential::STVK, args.young_modulus, args.poisson_ratio, args.we);
+  ebf[1] = make_shared<elastic_potential>(tets, nods, elastic_potential::COROTATIONAL, args.young_modulus, args.poisson_ratio, args.we);
   ebf[2] = make_shared<gravitational_potential>(tets, nods, args.density, args.wg);
   ebf[3] = make_shared<positional_potential>(nods, args.wp);
   ebf[4] = make_shared<ext_force_energy>(nods, 1e0);

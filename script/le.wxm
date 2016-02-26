@@ -1,0 +1,64 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 13.04.2 ] */
+
+/* [wxMaxima: input   start ] */
+load(cj_function);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+linear_elasticity(X, P, miu, lam, vol) := block(
+    [Ds, Dm, F, e],
+    Ds: addcol(col(X,2)-col(X,1), col(X,3)-col(X,1), col(X,4)-col(X,1)),
+    Dm: addcol(col(P,2)-col(P,1), col(P,3)-col(P,1), col(P,4)-col(P,1)),
+    F: Ds.invert(Dm),
+    e: 0.5*(transpose(F)+F)-ident(3),
+    vol*(miu*mat_norm(e, frobenius)^2+0.5*lam*mat_trace(e)^2)
+);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+X: genmatrix(X, 3, 4)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+P: genmatrix(P, 3, 4)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+Dm: genmatrix(Dm, 3, 3)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+miu: genmatrix(miu, 1, 1)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+lam: genmatrix(lam, 1, 1)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+vol: genmatrix(vol, 1, 1)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+energy: linear_elasticity(X, P, miu, lam, vol)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+force: GRAD(energy, X)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+matrix_size(force);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+stiffness: GRAD(force, X)$
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(stiffness.transpose(matrix(FLATTEN(X)))-transpose(force));
+/* [wxMaxima: input   end   ] */
+
+/* Maxima can't load/batch files which end with a comment! */
+"Created with wxMaxima"$

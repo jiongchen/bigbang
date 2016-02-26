@@ -31,6 +31,25 @@ block(
   return()
 )$
 
+/* FEM cloth */
+block(
+  [X, Dm, area, k],
+  X: genmatrix(X, 3, 3),
+  Dm: genmatrix(Dm, 2, 2),
+  area: genmatrix(area, 1, 1),
+  k: genmatrix(k, 4, 1),
+  
+  fem_stretch(X, Dm, area, k) := block(
+    [Ds, F, E, rtn],
+    Ds: addcol(col(X, 2)-col(X, 1), col(X, 3)-col(X, 1)),
+    F: Ds.Dm,
+    E: (transpose(F).F-ident(2))/2.0,
+    0.5*area*(k[1,1]*E[1,1]^2+k[3,1]*E[2,2]^2+2*k[2,1]*E[1,1]*E[2,2]+k[4,1]*E[1,2]^2)
+  ),
+  with_stdout(f, val_jac_hes_to_f90(fem_stretch, [X, Dm, area, k])),
+  return()
+)$
+
 /* mass spring */
 block(
   [X, d],

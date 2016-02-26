@@ -164,5 +164,12 @@ int extract_triplets_from_spmat(const Eigen::SparseMatrix<T, Option> &A, std::ve
   return 0;
 }
 
+template <typename T>
+void extract_rotation(const T *df, T *R) {
+  Eigen::Matrix<T, 3, 3> J(df);
+  Eigen::JacobiSVD<Eigen::Matrix<T, 3, 3>> svd(J, Eigen::ComputeFullU|Eigen::ComputeFullV);
+  Eigen::Map<Eigen::Matrix<T, 3, 3>>(R, 3, 3) = svd.matrixU()*svd.matrixV().transpose();
+}
+
 }
 #endif
