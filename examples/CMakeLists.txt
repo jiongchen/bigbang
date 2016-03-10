@@ -103,3 +103,9 @@ target_link_libraries(read_obj
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_wrinkle_sim test_wrinkle_sim.cc)
+target_link_libraries(test_wrinkle_sim
+    bigbang
+    ${Boost_LIBRARIES}
+)

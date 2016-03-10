@@ -34,7 +34,7 @@ else(CUDA_FOUND)
     set(CU_JACOBI_LIBRARY "")
 endif(CUDA_FOUND)
 
-add_library(bigbang SHARED ${source} potential.f90 pbd_cons.f90 elasticity.f90 nnls.c)
+add_library(bigbang SHARED ${source} jsoncpp.cpp potential.f90 pbd_cons.f90 elasticity.f90 nnls.c)
 target_link_libraries(bigbang
     jtf-mesh
     ${UMFPACK_LIBRARIES}
