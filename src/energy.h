@@ -120,12 +120,13 @@ private:
 class gravitational_potential : public Functional<double>
 {
 public:
-  gravitational_potential(const mati_t &cell, const matd_t &nods, const double rho, const double w);
+  gravitational_potential(const mati_t &cell, const matd_t &nods, const double rho, const double w, const int direction=1);
   size_t Nx() const;
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const { return __LINE__; }
 private:
+  const int direction_;
   const size_t dim_;
   double w_;
   Eigen::SparseMatrix<double> M_;
@@ -156,9 +157,10 @@ public:
   int Gra(const double *x, double *gra) const;
   int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
   void ResetWeight(const double w) { w_ = w; }
+  int ResetEdgeMaterial(const size_t p, const size_t q, const double scale_w, const double scale_len);
 private:
   const size_t dim_;
-  double w_;
+  matd_t w_;
   const mati_t &edge_;
   matd_t len_;
 };

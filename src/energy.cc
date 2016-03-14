@@ -291,8 +291,9 @@ double momentum_potential_bdf2::QueryKineticEnergy() const {
 }
 //==============================================================================
 gravitational_potential::gravitational_potential(const mati_t &cell, const matd_t &nods,
-                                                 const double rho, const double w)
-  : dim_(nods.size()), w_(w) {
+                                                 const double rho, const double w, const int direction)
+  : dim_(nods.size()), w_(w), direction_(direction) {
+  ASSERT(direction_ >= 0 && direction_ <= 2);
   calc_mass_matrix(cell, nods, rho, 1, &M_, true);
 }
 
@@ -304,7 +305,7 @@ int gravitational_potential::Val(const double *x, double *val) const {
   RETURN_WITH_COND_TRUE(w_ == 0.0);
   Map<const MatrixXd> X(x, 3, dim_/3);
   for (size_t i = 0; i < X.cols(); ++i)
-    *val += w_*9.8*M_.coeff(i, i)*X(1, i);
+    *val += w_*9.8*M_.coeff(i, i)*X(direction_, i);
   return 0;
 }
 
@@ -313,7 +314,7 @@ int gravitational_potential::Gra(const double *x, double *gra) const {
   Map<MatrixXd> g(gra, 3, dim_/3);
 #pragma omp parallel for
   for (size_t i = 0; i < g.cols(); ++i)
-    g(1, i) += w_*9.8*M_.coeff(i, i);
+    g(direction_, i) += w_*9.8*M_.coeff(i, i);
   return 0;
 }
 //==============================================================================
@@ -592,13 +593,14 @@ int positional_potential::Release(const size_t id) {
 
 //==============================================================================
 spring_potential::spring_potential(const mati_t &edge, const matd_t &nods, const double w)
-  : dim_(nods.size()), w_(w), edge_(edge) {
+  : dim_(nods.size()), edge_(edge) {
   len_.resize(edge_.size(2), 1);
 #pragma omp parallel for
   for (size_t i = 0; i < edge_.size(2); ++i) {
     matd_t vert = nods(colon(), edge_(colon(), i));
     calc_edge_length_(&len_[i], &vert[0]);
   }
+  w_ = w*ones<double>(edge_.size(2), 1);
 }
 
 size_t spring_potential::Nx() const {
@@ -606,32 +608,32 @@ size_t spring_potential::Nx() const {
 }
 
 int spring_potential::Val(const double *x, double *val) const {
-  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  RETURN_WITH_COND_TRUE(max(w_) == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     matd_t vert = X(colon(), edge_(colon(), i));
     double value = 0;
     mass_spring_(&value, &vert[0], &len_[i]);
-    *val += w_*value;
+    *val += w_[i]*value;
   }
   return 0;
 }
 
 int spring_potential::Gra(const double *x, double *gra) const {
-  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  RETURN_WITH_COND_TRUE(max(w_) == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   itr_matrix<double *> G(3, dim_/3, gra);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     matd_t vert = X(colon(), edge_(colon(), i));
     matd_t g = zeros<double>(3, 2);
     mass_spring_jac_(&g[0], &vert[0], &len_[i]);
-    G(colon(), edge_(colon(), i)) += w_*g;
+    G(colon(), edge_(colon(), i)) += w_[i]*g;
   }
   return 0;
 }
 
 int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
-  RETURN_WITH_COND_TRUE(w_ == 0.0);
+  RETURN_WITH_COND_TRUE(max(w_) == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     matd_t vert = X(colon(), edge_(colon(), i));
@@ -658,12 +660,29 @@ int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
         const size_t I = 3*edge_(p/3, i)+p%3;
         const size_t J = 3*edge_(q/3, i)+q%3;
         if ( H(p, q) != 0.0 )
-          hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+          hes->push_back(Triplet<double>(I, J, w_[i]*H(p, q)));
       }
     }
   }
   return 0;
 }
+
+int spring_potential::ResetEdgeMaterial(const size_t p, const size_t q, const double scale_w, const double scale_len) {
+  size_t i = 0;
+  for ( ; i < edge_.size(2); ++i) {
+    if ( (p == edge_(0, i) && q == edge_(1, i)) || (p == edge_(1, i) && q == edge_(0, i)) ) {
+      len_[i] *= scale_len;
+      w_[i] *= scale_w;
+      break;
+    }
+  }
+  if ( i == edge_.size(2) ) {
+    cerr << "[Error] No such edge\n";
+    return __LINE__;
+  }
+  return 0;
+}
+
 //==============================================================================
 fast_mass_spring::fast_mass_spring(const mati_t &edge, const matd_t &nods, const double w)
   : dim_(nods.size()), w_(w), edge_(edge) {

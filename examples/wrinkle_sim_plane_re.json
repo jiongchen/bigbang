@@ -1,0 +1,28 @@
+// assume the working directory is build/bin
+// 14th, March, 2016
+{
+  "mesh": "../../dat/plane_re.obj",
+  "density": 1.0,
+  "ws": 500,   // stretch stiffness
+  "wb": 1e-2, // bending stiffness
+  "wp": 1e3,  // position constraint stiffness
+  "wg": 1.0,   // gravity stiffness
+  "wl": 1e2,   // curve bending stiffness
+  "gravity_direction": 1, // x: 0, y: 1, z: 2
+  "frames": 50,
+  "timestep": 0.01,
+  "handles": [
+    {"id": 3569, "pos": [2.718339, 1.656610, 0.424130]},
+    {"id": 2575, "pos": [0.718339, 1.656610, 0.424130]}
+    // {"id": 1, "pos": [0.718339, 1.656610, 2.424129]},
+    // {"id": 3721, "pos": [2.718339, 1.656610, 2.424129]}
+  ],
+  "stitch": [1246, 1258, 1259, 1269, 1280, 1290, 1294, 1312, 3033, 3012, 2999, 2998, 2991, 2984],
+  "stiffness_scale": 5.0,
+  "rest_length_scale": 0.75,
+  "outdir": "./wrinkle_sim/plane_re",
+  
+  "max_iter": 10000,
+  "tolerance": 1e-8,
+  "line_search": true
+}
