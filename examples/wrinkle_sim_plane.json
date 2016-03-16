@@ -9,12 +9,12 @@
   "wg": 1.0,   // gravity stiffness
   "wl": 1e2,   // curve bending stiffness
   "gravity_direction": 1, // x: 0, y: 1, z: 2
-  "frames": 50,
+  "frames": 150,
   "timestep": 0.01,
   "handles": [
     {"id": 0, "pos": [1, 0, 1]},
-    // {"id": 1, "pos": [-1, 0, 1]},
     {"id": 2, "pos": [1, 0, -1]}
+    // {"id": 1, "pos": [-1, 0, 1]},
     // {"id": 3, "pos": [-1, 0, -1]}
   ],
   "stitch": [51, 523, 107, 315, 8, 320, 112, 528, 56],
@@ -22,7 +22,7 @@
   "rest_length_scale": 0.75,
   "outdir": "./wrinkle_sim/plane",
   
-  "max_iter": 10000,
+  "max_iter": 10,
   "tolerance": 1e-8,
-  "line_search": true
+  "line_search": false
 }

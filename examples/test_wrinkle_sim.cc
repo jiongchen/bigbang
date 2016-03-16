@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
     os.close();
 
-    lbfgs_solve(&nods[0], nods.size(), energy, optarg);
+    newton_solve(&nods[0], nods.size(), energy, optarg);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
   }
 

@@ -3,7 +3,7 @@
 {
   "mesh": "../../dat/plane_re.obj",
   "density": 1.0,
-  "ws": 500,   // stretch stiffness
+  "ws": 250,   // stretch stiffness
   "wb": 1e-2, // bending stiffness
   "wp": 1e3,  // position constraint stiffness
   "wg": 1.0,   // gravity stiffness
@@ -22,7 +22,7 @@
   "rest_length_scale": 0.75,
   "outdir": "./wrinkle_sim/plane_re",
   
-  "max_iter": 10000,
+  "max_iter": 10,
   "tolerance": 1e-8,
-  "line_search": true
+  "line_search": false
 }
