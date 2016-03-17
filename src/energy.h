@@ -165,6 +165,22 @@ private:
   matd_t len_;
 };
 
+class gauss_newton_spring : public Functional<double>
+{
+public:
+  gauss_newton_spring(const mati_t &edge, const matd_t &nods, const double w);
+  size_t Nx() const;
+  int Val(const double *x, double *val) const;
+  int Gra(const double *x, double *gra) const;
+  int Hes(const double *x, std::vector<Eigen::Triplet<double>> *hes) const;
+  void ResetWeight(const double w) { w_ = w; }
+private:
+  const size_t dim_;
+  matd_t w_;
+  const mati_t &edge_;
+  matd_t len_;
+};
+
 template<typename T>
 void hash_combine(size_t &seed, T const &v) {
   seed ^= std::hash<T>()(v)+0x9e3779b9+(seed<<6)+(seed>>2);
