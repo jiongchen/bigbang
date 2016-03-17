@@ -31,7 +31,7 @@ struct argument {
 };
 }
 
-static opt_args optparam = {10000, 1e-8, true};
+static opt_args optparam = {1000, 1e-8, false};
 
 #define APPLY_FORCE(frame, id, f)                                     \
   if ( i == frame )                                                   \
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
       ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
       ("total_frame,n", po::value<size_t>()->default_value(200), "set the frame number")
       ("bw98", po::value<int>()->default_value(0), "adopt BW98 stretch model?")
-      ("ws", po::value<double>()->default_value(1e2), "set the stretch weight")
+      ("ws", po::value<double>()->default_value(1.2e3), "set the stretch weight")
       ("wb", po::value<double>()->default_value(1e-3), "set the bending weight")
       ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
       ("wp", po::value<double>()->default_value(1e3), "set the position weight")
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
       break;
     default:
       ebf[1] = make_shared<bw98_stretch_energy>(tris, nods, args.ws);
-      ebf[6] = make_shared<bw98_shear_energy>(tris, nods, args.ws/2.0);
+      ebf[6] = make_shared<bw98_shear_energy>(tris, nods, 0.75*args.ws);
       break;
   }
   ebf[2] = make_shared<surf_bending_potential>(diams, nods, args.wb);
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
 //    APPLY_FORCE(0, 3, f);
 //    REMOVE_FORCE(40, 3);
-//    RELEASE_VERT(160, 2);
+    RELEASE_VERT(160, 2);
 
     newton_solve(&nods[0], nods.size(), energy, optparam);
     dynamic_pointer_cast<momentum_potential>(ebf[0])->Update(&nods[0]);
