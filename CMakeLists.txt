@@ -43,6 +43,13 @@ endif(LBFGS_FOUND)
 # ARPACK
 find_package(Arpack REQUIRED)
 
+# ALGLIB
+find_package(ALGLIB)
+if(ALGLIB_FOUND)
+    message("-- Alglib @ ${ALGLIB_INCLUDES}")
+    include_directories(${ALGLIB_INCLUDES})
+endif(ALGLIB_FOUND)
+
 # CUDA
 find_package(CUDA)
 if(CUDA_FOUND)

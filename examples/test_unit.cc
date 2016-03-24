@@ -275,6 +275,55 @@ int test_constitutive_law(ptree &pt) {
   return 0;
 }
 
+extern "C" {
+void mass_spring_(double *val, const double *x, const double *d);
+void mass_spring_jac_(double *jac, const double *x, const double *d);
+void mass_spring_hes_(double *hes, const double *x, const double *d);
+}
+
+int test_mass_spring_hess(ptree &pt) {
+  Matrix<double, 3, 2> x;
+  x.setZero();
+
+  double rlen = pt.get<double>("rest_len.value");
+  cout << "rest length: " << rlen << endl;
+  double clen = pt.get<double>("curr_len.value");
+  x(0, 1) = clen;
+  Matrix<double, 3, 1> u = x.col(0)-x.col(1);
+  cout << "curr length: " << u.norm() << endl;
+
+  double value = 0;
+  mass_spring_(&value, x.data(), &rlen);
+  cout << "energy: " << value << endl << endl;
+
+  Matrix<double, 6, 1> g0(0.0), g1(0.0);
+  mass_spring_jac_(g0.data(), x.data(), &rlen);
+  g1.head(3) = 2./rlen*(1-rlen/u.norm())*u;
+  g1.tail(3) = 2./rlen*(1-rlen/u.norm())*-u;
+  cout << "grad diff:\n" << g0-g1 << endl << endl;
+
+  Matrix<double, 6, 6> H0, H1;
+  H0.setZero();
+  mass_spring_hes_(H0.data(), x.data(), &rlen);
+  SelfAdjointEigenSolver<Matrix<double, 6, 6>> solver(H0);
+  cout << "eigenvalues:\n" << solver.eigenvalues() << endl << endl;
+
+//  Matrix<double, 3, 3> L = H0.topLeftCorner(3, 3);
+//  SelfAdjointEigenSolver<Matrix<double, 3, 3>> solver1(L);
+//  cout << "eigen:\n" << solver1.eigenvalues() << endl << endl;
+  {
+    Matrix<double, 3, 3> diffH = H0.topLeftCorner(3, 3)-H0.bottomRightCorner(3, 3);
+    cout << "diffH:\n" << diffH << endl << endl;
+  }
+  {
+    Matrix<double, 3, 3> diffH = H0.topLeftCorner(3, 3)+H0.bottomLeftCorner(3, 3);
+    cout << "diffH:\n" << diffH << endl << endl;
+  }
+
+  cout << "done\n";
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
   ptree pt;
@@ -292,6 +341,7 @@ int main(int argc, char *argv[])
     CALL_SUB_PROG(test_cuda_jacobi);
     CALL_SUB_PROG(test_matrix_log2);
     CALL_SUB_PROG(test_constitutive_law);
+    CALL_SUB_PROG(test_mass_spring_hess);
   } catch (const boost::property_tree::ptree_error &e) {
     cerr << "Usage: " << endl;
     zjucad::show_usage_info(std::cerr, pt);

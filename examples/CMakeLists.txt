@@ -109,3 +109,13 @@ target_link_libraries(test_wrinkle_sim
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_alglib test_alglib.cc)
+target_link_libraries(test_alglib
+    ${ALGLIB_LIBRARIES}
+)
+
+add_executable(obj2vtk obj2vtk.cc)
+target_link_libraries(obj2vtk
+    jtf-mesh
+)
