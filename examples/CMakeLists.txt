@@ -119,3 +119,14 @@ add_executable(obj2vtk obj2vtk.cc)
 target_link_libraries(obj2vtk
     jtf-mesh
 )
+
+add_executable(vtk2obj vtk2obj.cc)
+target_link_libraries(vtk2obj
+    jtf-mesh
+)
+
+add_executable(test_cosserat test_cosserat.cc)
+target_link_libraries(test_cosserat
+    bigbang
+    ${Boost_LIBRARIES}
+)

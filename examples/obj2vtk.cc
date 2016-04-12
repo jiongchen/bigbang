@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
   jtf::mesh::load_obj(argv[1], tris, nods);
   ofstream os(argv[2]);
   tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
+  os.close();
   cout << "success\n";
   return 0;
 }

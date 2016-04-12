@@ -1,0 +1,72 @@
+load(hj_fortran2)$
+load(cj_function)$
+
+optimprefix : tt$
+
+f: openw("cosserat_rod.f90")$
+
+block(
+  [X, d, Es, r],
+  X: genmatrix(X, 3, 2),
+  d: genmatrix(d, 1, 1),    /* integration length */
+  Es: genmatrix(Es, 1, 1), /* stretching Young's modulus */
+  r: genmatrix(r, 1, 1),     /* radius of cross section */
+  
+  rod_stretch(X, d, Es, r) := block(
+    [Ks],
+    Ks: Es*3.14159265358979323846*r*r,
+    0.5*d*Ks*(NORM(col(X, 2)-col(X, 1))/d[1,1]-1)^2
+  ),
+  with_stdout(f, val_jac_hes_to_f90(rod_stretch, [X, d, Es, r])),
+  return()
+)$
+
+block(
+  [Q, u, d, E, G, r],
+  Q: genmatrix(Q, 4, 2),
+  u: genmatrix(u, 3, 1),
+  d: genmatrix(d, 1, 1),  /* integration length */ 
+  E: genmatrix(E, 1, 1),  /* bending Young's modulus */
+  G: genmatrix(G, 1, 1), /* shear modulus */
+  r: genmatrix(r, 1, 1),   /* radius of cross section */
+  
+  rod_bend(Q, u, d, E, G, r) := block(
+    [K, B, U], 
+    K: [],
+    K: append(K, [E[1,1]*3.14159265358979323846*r[1,1]^2/4.0]),
+    K: append(K, [E[1,1]*3.14159265358979323846*r[1,1]^2/4.0]),
+    K: append(K, [E[1,1]*3.14159265358979323846*r[1,1]^2/2.0]),
+    B: [],
+    B: append(B, [matrix([0, 0, 0, 1], [0, 0, 1, 0], [0, -1, 0, 0], [-1, 0, 0, 0])]),
+    B: append(B, [matrix([0, 0, -1, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, -1, 0, 0])]),
+    B: append(B, [matrix([0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1], [0, 0, -1, 0])]),
+    U: list_matrix_entries(u),
+    rtn: 0,
+    for i:1 while i <= 3 do
+      rtn: rtn+0.5*d[1,1]*K[i]*( DOT(B[i].(col(Q, 1)+col(Q, 2)), (col(Q, 2)-col(Q, 1))/d[1,1]) - U[i] )^2,
+    matrix([rtn])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(rod_bend, [Q, u, d, E, G, r])),
+  return()
+)$
+
+block(
+  XQ: genmatrix(XQ, 10, 1),
+  d: genmatrix(d, 1, 1),
+  kappa: genmatrix(kappa, 1, 1),
+  
+  rod_couple(XQ, d, kappa) := block(
+    [dx, d3, q1, q2, q3, q4],
+    dx: matrix([ XQ[4,1]-XQ[1,1] ], [ XQ[5,1]-XQ[2,1] ], [ XQ[6,1]-XQ[3,1] ]),
+    q1: XQ[7, 1],
+    q2: XQ[8, 1],
+    q3: XQ[9, 1],
+    q4: XQ[10, 1],
+    d3: matrix([2*(q1*q3+q2*q4)], [2*(q2*q3-q1*q4)], [-q1^2-q2^2+q3^2+q4^2]),
+    0.5*d*kappa*DOT(dx/NORM(dx)-d3, dx/NORM(dx)-d3)
+  ),
+  with_stdout(f, val_jac_hes_to_f90(rod_couple, [XQ, d, kappa])),
+  return()
+)$
+
+close(f)$
