@@ -174,6 +174,7 @@ int lbfgs_solve(double *x, const size_t dim, const pfunc &f, const opt_args &arg
   energy = f;
   lbfgsfloatval_t fx;
   lbfgs_parameter_t param;
+  param.max_iterations = args.max_iter;
   lbfgs_parameter_init(&param);
 
   int ret = lbfgs(dim, x, &fx, evaluate, progress, NULL, &param);

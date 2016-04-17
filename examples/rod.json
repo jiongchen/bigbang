@@ -9,7 +9,8 @@
 	"stretch_modulus": 20,
 	"spring_const": 100,
 
-	"max_iter": 20,
-	"tolerance": 1e-8,
+	"frames": 300,
+	"max_iter": 100,
+	"tolerance": 1e-6,
 	"outdir": "./cosserat_rod/"
 }

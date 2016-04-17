@@ -76,26 +76,8 @@ int main(int argc, char *argv[])
 
   Matrix<double, 3, 2> ends = Matrix<double, 3, 2>::Zero();
   ends(0, 1) = json["length"].asDouble();
-
   Matrix3Xd rod;
   generate_rod(ends, json["size"].asUInt(), rod);
-  cosserat_solver solver(rod);
-  {
-    string outfile = json["outdir"].asString()+"/rest.vtk";
-    draw_rod(outfile.c_str(), rod);
-  }
-  Matrix4Xd q;
-  init_rod_as_helix(1.0, 0.2, M_PI/4, 1, rod);
-  q.setRandom(4, rod.cols()-1);
-  for (size_t i = 0; i < q.cols(); ++i)
-    q.col(i) = q.col(i).normalized();
-  solver.init_rod(rod, q);
-  {
-    string outfile = json["outdir"].asString()+"/init_rod.vtk";
-    draw_rod(outfile.c_str(), rod);
-    outfile = json["outdir"].asString()+"/init_frame.vtk";
-    draw_frame(outfile.c_str(), rod, q);
-  }
 
   rod_material material = {
     json["timestep"].asDouble(),
@@ -106,13 +88,41 @@ int main(int argc, char *argv[])
     json["stretch_modulus"].asDouble(),
     json["spring_const"].asDouble()
   };
-  solver.config_material(material);
-
-  solver.precompute();
-  solver.advance(json["max_iter"].asUInt(), json["tolerance"].asDouble());
+  cosserat_solver solver(rod, material);
   {
-    string outfile = json["outdir"].asString()+"/deform.vtk";
-    draw_rod(outfile.c_str(), solver.get_rod_pos());
+    string outfile = json["outdir"].asString()+"/rest.vtk";
+    draw_rod(outfile.c_str(), rod);
+  }
+  init_rod_as_spiral(0.008, M_PI/6, 1, rod);
+  Matrix4Xd q; Matrix3d u0;
+  u0.col(2) = (rod.col(1)-rod.col(0)).normalized();
+  u0(0, 0) = -u0(1, 2); u0(1, 0) = u0(0, 2); u0(2, 0) = 0;
+  u0.col(0).normalize();
+  u0.col(1) = u0.col(2).cross(u0.col(0));
+  compute_bishop_frame(rod, u0, q);
+//  q.resize(NoChange, rod.cols()-1);
+//  srand(time(NULL));
+//  for (size_t i = 0; i < q.cols(); ++i)
+//    q.col(i) = Vector4d(1, 0, 0, 0); //::Random().normalized();
+  solver.init_rod(rod, q);
+  {
+    string outfile = json["outdir"].asString()+"/init_rod.vtk";
+    draw_rod(outfile.c_str(), rod);
+    outfile = json["outdir"].asString()+"/init_frame.vtk";
+    draw_frame(outfile.c_str(), rod, q);
+  }
+
+  solver.pin_down_vert(0, &rod(0, 0));
+  for (size_t i = 0; i < json["frames"].asUInt(); ++i) {
+    cout << "[Info] frame " << i << endl;
+    {
+      char outfile[256];
+      sprintf(outfile, "%s/deform_%zu.vtk", json["outdir"].asString().c_str(), i);
+      draw_rod(outfile, solver.get_rod_pos());
+      sprintf(outfile, "%s/deform_frm_%zu.vtk", json["outdir"].asString().c_str(), i);
+      draw_frame(outfile, solver.get_rod_pos(), solver.get_frame());
+    }
+    solver.advance(json["max_iter"].asUInt(), json["tolerance"].asDouble());
   }
 
   cout << "[Info] done\n";

@@ -24,7 +24,7 @@ block(
 block(
   [Q, u, d, E, G, r],
   Q: genmatrix(Q, 4, 2),
-  u: genmatrix(u, 3, 1),
+  u: genmatrix(u, 3, 1),  /* prescribed strain rate */
   d: genmatrix(d, 1, 1),  /* integration length */ 
   E: genmatrix(E, 1, 1),  /* bending Young's modulus */
   G: genmatrix(G, 1, 1), /* shear modulus */
@@ -51,6 +51,7 @@ block(
 )$
 
 block(
+  [XQ, d, kappa],
   XQ: genmatrix(XQ, 10, 1),
   d: genmatrix(d, 1, 1),
   kappa: genmatrix(kappa, 1, 1),
