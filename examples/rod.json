@@ -1,15 +1,15 @@
 {
-	"size": 100,
-	"length": 10,
-	"timestep": 0.01,
+	"size": 50,
+	"length": 1,
+	"timestep": 0.03,
 	"radius": 0.01,
 	"density": 1300,
 	"young_modulus": 0.5,
 	"shearing_modulus": 0.5,
-	"stretch_modulus": 20,
+	"stretch_modulus": 30,
 	"spring_const": 100,
 
-	"frames": 300,
+	"frames": 400,
 	"max_iter": 100,
 	"tolerance": 1e-6,
 	"outdir": "./cosserat_rod/"

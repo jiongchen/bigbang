@@ -31,7 +31,7 @@ static int draw_frame(const char *file, const Matrix3Xd &rod, const Matrix4Xd &q
   Matrix<double, 3, -1> nods;
   nods.resize(NoChange, 4*(rod.cols()-1));
   for (size_t i = 0; i < rod.cols()-1; ++i) {
-    double len = 0.5*(rod.col(i)-rod.col(i+1)).norm();
+    double len = 0.1;//*(rod.col(i)-rod.col(i+1)).norm();
     Matrix3d R = Quaternion<double>(q.col(i)).toRotationMatrix();
     nods.col(4*i+0) = (rod.col(i)+rod.col(i+1))/2;
     nods.col(4*i+1) = nods.col(4*i+0)+R.col(0).normalized()*len;
@@ -88,28 +88,30 @@ int main(int argc, char *argv[])
     json["stretch_modulus"].asDouble(),
     json["spring_const"].asDouble()
   };
+
   cosserat_solver solver(rod, material);
   {
     string outfile = json["outdir"].asString()+"/rest.vtk";
     draw_rod(outfile.c_str(), rod);
   }
-  init_rod_as_spiral(0.008, M_PI/6, 1, rod);
-  Matrix4Xd q; Matrix3d u0;
-  u0.col(2) = (rod.col(1)-rod.col(0)).normalized();
-  u0(0, 0) = -u0(1, 2); u0(1, 0) = u0(0, 2); u0(2, 0) = 0;
-  u0.col(0).normalize();
-  u0.col(1) = u0.col(2).cross(u0.col(0));
-  compute_bishop_frame(rod, u0, q);
-//  q.resize(NoChange, rod.cols()-1);
-//  srand(time(NULL));
-//  for (size_t i = 0; i < q.cols(); ++i)
-//    q.col(i) = Vector4d(1, 0, 0, 0); //::Random().normalized();
-  solver.init_rod(rod, q);
+
+  Matrix4Xd frm;
+  frm.resize(NoChange, rod.cols()-1);
+  Matrix3d u0;
+  u0 << 0, 0, 1,
+      1, 0, 0,
+      0, 1, 0;
+  for (size_t i = 0; i < frm.cols(); ++i) {
+    Matrix3d rot = AngleAxisd(i*M_PI/6, -Vector3d::UnitX()).toRotationMatrix();
+    frm.col(i) = Quaterniond(rot*u0).coeffs();
+  }
+
+  solver.init_rod(rod, frm);
   {
     string outfile = json["outdir"].asString()+"/init_rod.vtk";
     draw_rod(outfile.c_str(), rod);
     outfile = json["outdir"].asString()+"/init_frame.vtk";
-    draw_frame(outfile.c_str(), rod, q);
+    draw_frame(outfile.c_str(), rod, frm);
   }
 
   solver.pin_down_vert(0, &rod(0, 0));

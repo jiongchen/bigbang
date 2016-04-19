@@ -179,16 +179,16 @@ public:
       rr.col(0) = X.segment<3>(3*i);
       rr.col(1) = X.segment<3>(3*(i+1));
       Matrix<double, 6, 6> H = Matrix<double, 6, 6>::Zero();
-      if ( (rr.col(0)-rr.col(1)).norm() > len_(i) ) {
+      if ( (rr.col(0)-rr.col(1)).norm() >= len_(i) ) {
         rod_stretch_hes_(H.data(), rr.data(), &len_(i), &Es_, &r_);
       } else {
-        rod_stretch_hes_(H.data(), rr.data(), &len_(i), &Es_, &r_);
-//        double value = 0;
-//        rod_stretch_(&value, rr.data(), &len_(i), &Es_, &r_);
-//        Matrix<double, 6, 1> g = Matrix<double, 6, 1>::Zero();
-//        rod_stretch_jac_(g.data(), rr.data(), &len_(i), &Es_, &r_);
-//        g = 0.5*g/sqrt(value);
-//        H = 2*g*g.transpose();
+//        rod_stretch_hes_(H.data(), rr.data(), &len_(i), &Es_, &r_);
+        double value = 0;
+        rod_stretch_(&value, rr.data(), &len_(i), &Es_, &r_);
+        Matrix<double, 6, 1> g = Matrix<double, 6, 1>::Zero();
+        rod_stretch_jac_(g.data(), rr.data(), &len_(i), &Es_, &r_);
+        g = 0.5*g/sqrt(value);
+        H = 2*g*g.transpose();
       }
       for (size_t p = 0; p < 6; ++p) {
         for (size_t q = 0; q < 6; ++q) {
@@ -226,8 +226,9 @@ public:
       Matrix<double, 4, 2> qq;
       qq.col(0) = X.segment<4>(r_size_+4*i);
       qq.col(1) = X.segment<4>(r_size_+4*(i+1));
-      double value = 0, u = 1;
-      rod_bend_(&value, qq.data(), &u, &len_(i), &E_, &G_, &r_);
+      double value = 0;
+      Vector3d u = Vector3d::Ones();
+      rod_bend_(&value, qq.data(), u.data(), &len_(i), &E_, &G_, &r_);
       *val += value;
     }
     return 0;
@@ -240,8 +241,8 @@ public:
       qq.col(0) = X.segment<4>(r_size_+4*i);
       qq.col(1) = X.segment<4>(r_size_+4*(i+1));
       Matrix<double, 4, 2> g = Matrix<double, 4, 2>::Zero();
-      double u = 1;
-      rod_bend_jac_(g.data(), qq.data(), &u, &len_(i), &E_, &G_, &r_);
+      Vector3d u = Vector3d::Ones();
+      rod_bend_jac_(g.data(), qq.data(), u.data(), &len_(i), &E_, &G_, &r_);
       G.segment<4>(r_size_+4*i) += g.col(0);
       G.segment<4>(r_size_+4*(i+1)) += g.col(1);
     }
@@ -254,8 +255,8 @@ public:
       qq.col(0) = X.segment<4>(r_size_+4*i);
       qq.col(1) = X.segment<4>(r_size_+4*(i+1));
       Matrix<double, 8, 8> H = Matrix<double, 8, 8>::Zero();
-      double u = 1;
-      rod_bend_hes_(H.data(), qq.data(), &u, &len_(i), &E_, &G_, &r_);
+      Vector3d u = Vector3d::Ones();
+      rod_bend_hes_(H.data(), qq.data(), u.data(), &len_(i), &E_, &G_, &r_);
       for (size_t p = 0; p < 8; ++p) {
         for (size_t q = 0; q < 8; ++q) {
           const size_t I = r_size_+4*(i+p/4)+p%4;
@@ -429,7 +430,7 @@ void cosserat_solver::precompute() {
 }
 
 void cosserat_solver::advance(const size_t max_iter, const double tolerance) {
-  const size_t dim = r_.size()+q_.size();
+  const size_t dim = potential_->Nx();
   VectorXd xn(dim), vn(dim);
   std::copy(r_.data(), r_.data()+r_.size(), xn.data());
   std::copy(q_.data(), q_.data()+q_.size(), xn.data()+r_.size());
@@ -438,19 +439,16 @@ void cosserat_solver::advance(const size_t max_iter, const double tolerance) {
   VectorXd xstar = xn;
   // iterative solve
   for (size_t iter = 0; iter < max_iter; ++iter) {
-//    double value = 0; {
-//      potential_->Val(xstar.data(), &value);
-//      cout << "\t@potential value: " << value << endl;
-//    }
+    double value = 0; {
+      if ( iter % 100 == 0 ) {
+        potential_->Val(xstar.data(), &value);
+        cout << "\t@potential value: " << value << endl;
+      }
+    }
     VectorXd g = VectorXd::Zero(dim); {
       potential_->Gra(xstar.data(), g.data());
       g *= -1;
-//      cout << "\t@gradient norm: " << g.norm() << endl << endl;
     }
-//    if ( g.norm() < tolerance ) {
-//      cout << "\t@CONVERGE with gradient norm: " << g.norm() << "\n";
-//      break;
-//    }
     SparseMatrix<double> H(dim, dim); {
       vector<Triplet<double>> trips;
       potential_->Hes(xstar.data(), &trips);
@@ -468,38 +466,21 @@ void cosserat_solver::advance(const size_t max_iter, const double tolerance) {
     VectorXd dx = solver.solve(rhs);
     ASSERT(solver.info() == Success);
     double xstar_norm = xstar.norm();
-    double h = 1.0;
-//    // line search here
-//    if ( true ) {
-//      h /= 0.5;
-//      VectorXd xnew(dim);
-//      double lhs = 0.0, rhs = 0.0;
-//      do {
-//        h *= 0.5;
-//        xnew = xstar+h*dx;
-//        potential_->Val(&xnew[0], &lhs);
-//        rhs = value+h*0.45*(-g.dot(dx));
-//      } while ( lhs >= value && h > 1e-12 );
-//    }
-    xstar += h*dx;
+    xstar += dx;
     for (size_t k = 0; k < q_.cols(); ++k)
       xstar.segment<4>(r_.size()+4*k).normalize();
-    if ( h*dx.norm() < tolerance*xstar_norm ) {
+    if ( dx.norm() < tolerance*xstar_norm ) {
       cout << "\t@CONVERGED\n";
       break;
     }
   }
-  // update velocity;
+  // update velocity
   vn = (xstar-xn)/param_.h;
   xn = xstar;
   std::copy(xn.data(), xn.data()+r_.size(), r_.data());
   std::copy(xn.data()+r_.size(), xn.data()+dim, q_.data());
   std::copy(vn.data(), vn.data()+r_.size(), vr_.data());
-  std::copy(vn.data()+r_.size(), vn.data()+dim, vq_.data());
-  double total_length = 0;
-  for (size_t i = 0; i < r_.cols()-1; ++i)
-    total_length += (r_.col(i)-r_.col(i+1)).norm();
-  cout << "[Info] total length: " << total_length << endl;
+  std::copy(vn.data()+vr_.size(), vn.data()+dim, vq_.data());
 }
 
 }
