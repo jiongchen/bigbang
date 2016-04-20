@@ -1,24 +1,24 @@
 {
 	"size": 50,
 	"length": 1.0,
-	"timestep": 0.08,
+	"timestep": 0.1,
 	"radius": 0.01,
 	"density": 1300,
 	"young_modulus": 0.5,
 	"shearing_modulus": 0.5,
-	"stretch_modulus": 20,
+	"stretch_modulus": 12,
 	"spring_const": 100,
-	"intrinsic_bending": [1, 1, 1],
+	"intrinsic_bending": [0, 0, 0],
 	
 	"transform": {
-		"scale": 1.0,
+		"scale": 0.9,
 		"translate": [0, 0, 0]
 	},
-	"frame_cycle": 1,
-	"handles": [0],
+	"frame_cycle": 3,
+	"handles": [0, 49],
 
 	"frames": 2000,
 	"max_iter": 100,
 	"tolerance": 1e-6,
-	"outdir": "./cosserat_rod_fix_one_ends/"
+	"outdir": "./cosserat_rod_fix_two_ends_zero_intrinsic/"
 }

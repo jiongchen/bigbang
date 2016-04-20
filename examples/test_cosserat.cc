@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
   Matrix3Xd rod;
   generate_rod(ends, json["size"].asUInt(), rod);
 
-  rod_material material = {
+  rod_material mtr = {
     json["timestep"].asDouble(),
     json["radius"].asDouble(),
     json["density"].asDouble(),
@@ -97,9 +97,9 @@ int main(int argc, char *argv[])
     json["intrinsic_bending"].get((Json::ArrayIndex)1, 0.0).asDouble(),
     json["intrinsic_bending"].get((Json::ArrayIndex)2, 0.0).asDouble()
   };
-  printf("[Info] intrinsic bending and torsion: [%lf, %lf, %f]\n", material.u0, material.u1, material.u2);
+  printf("[Info] intrinsic bending and torsion: [%lf, %lf, %f]\n", mtr.u0, mtr.u1, mtr.u2);
 
-  cosserat_solver solver(rod, material);
+  cosserat_solver solver(rod, mtr);
   {
     string outfile = json["outdir"].asString()+"/rest.vtk";
     draw_rod(outfile.c_str(), rod);

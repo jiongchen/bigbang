@@ -401,8 +401,7 @@ cosserat_solver::cosserat_solver(const Matrix3Xd &rest, const rod_material &para
   : rest_(rest), param_(param) {
   buffer_.resize(4);
   buffer_[0] = make_shared<rod_stretch_energy>(rest_, param_.Es, param_.radius);
-  buffer_[1] = make_shared<rod_bend_energy>(rest_, param_.E, param_.G,
-                                            param_.radius, Vector3d(param_.u0, param_.u1, param_.u2));
+  buffer_[1] = make_shared<rod_bend_energy>(rest_, param_.E, param_.G, param_.radius, Vector3d(param_.u0, param_.u1, param_.u2));
   buffer_[2] = make_shared<coupling_energy>(rest_, param_.kappa);
   buffer_[3] = make_shared<rod_fix_vert_energy>(rest_);
   try {

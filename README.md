@@ -25,4 +25,5 @@ This is going to be my spare-time project which will involve implementations of 
 - Fast Simulation of Mass-Spring Systems
 - Projective Dynamics: Fusing Constraint Projections for Fast Simulation
 - A Chebyshev Semi-Iterative Approach for Accelerating Projective and Position-based Dynamics
+- CORDE: Cosserat Rod Elements for the Dynamic Simulation of One-Dimensional Elastic Objects
 
