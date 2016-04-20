@@ -30,6 +30,7 @@ struct rod_material {
   double density;
   double E, G, Es;
   double kappa;
+  double u0, u1, u2;
 };
 
 /// @brief designed as a physics solver

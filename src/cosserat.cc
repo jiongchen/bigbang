@@ -210,8 +210,8 @@ private:
 class rod_bend_energy : public Functional<double>
 {
 public:
-  rod_bend_energy(const Matrix3Xd &rod, const double E, const double G, const double r)
-    : r_size_(rod.size()), q_size_(4*(rod.cols()-1)), elem_num_(rod.cols()-2), E_(E), G_(G), r_(r) {
+  rod_bend_energy(const Matrix3Xd &rod, const double E, const double G, const double r, const Vector3d &uk)
+    : r_size_(rod.size()), q_size_(4*(rod.cols()-1)), elem_num_(rod.cols()-2), E_(E), G_(G), r_(r), uk_(uk) {
     len_ = VectorXd::Zero(elem_num_);
     for (size_t i = 0; i < elem_num_; ++i) {
       len_(i) = 0.5*((rod.col(i)-rod.col(i+1)).norm()+(rod.col(i+1)-rod.col(i+2)).norm());
@@ -227,8 +227,7 @@ public:
       qq.col(0) = X.segment<4>(r_size_+4*i);
       qq.col(1) = X.segment<4>(r_size_+4*(i+1));
       double value = 0;
-      Vector3d u = Vector3d::Ones();
-      rod_bend_(&value, qq.data(), u.data(), &len_(i), &E_, &G_, &r_);
+      rod_bend_(&value, qq.data(), uk_.data(), &len_(i), &E_, &G_, &r_);
       *val += value;
     }
     return 0;
@@ -241,8 +240,7 @@ public:
       qq.col(0) = X.segment<4>(r_size_+4*i);
       qq.col(1) = X.segment<4>(r_size_+4*(i+1));
       Matrix<double, 4, 2> g = Matrix<double, 4, 2>::Zero();
-      Vector3d u = Vector3d::Ones();
-      rod_bend_jac_(g.data(), qq.data(), u.data(), &len_(i), &E_, &G_, &r_);
+      rod_bend_jac_(g.data(), qq.data(), uk_.data(), &len_(i), &E_, &G_, &r_);
       G.segment<4>(r_size_+4*i) += g.col(0);
       G.segment<4>(r_size_+4*(i+1)) += g.col(1);
     }
@@ -255,8 +253,7 @@ public:
       qq.col(0) = X.segment<4>(r_size_+4*i);
       qq.col(1) = X.segment<4>(r_size_+4*(i+1));
       Matrix<double, 8, 8> H = Matrix<double, 8, 8>::Zero();
-      Vector3d u = Vector3d::Ones();
-      rod_bend_hes_(H.data(), qq.data(), u.data(), &len_(i), &E_, &G_, &r_);
+      rod_bend_hes_(H.data(), qq.data(), uk_.data(), &len_(i), &E_, &G_, &r_);
       for (size_t p = 0; p < 8; ++p) {
         for (size_t q = 0; q < 8; ++q) {
           const size_t I = r_size_+4*(i+p/4)+p%4;
@@ -272,6 +269,7 @@ private:
   const size_t elem_num_;
   const double E_, G_, r_;
   VectorXd len_;
+  const Vector3d uk_;
 };
 
 class coupling_energy : public Functional<double>
@@ -403,7 +401,8 @@ cosserat_solver::cosserat_solver(const Matrix3Xd &rest, const rod_material &para
   : rest_(rest), param_(param) {
   buffer_.resize(4);
   buffer_[0] = make_shared<rod_stretch_energy>(rest_, param_.Es, param_.radius);
-  buffer_[1] = make_shared<rod_bend_energy>(rest_, param_.E, param_.G, param_.radius);
+  buffer_[1] = make_shared<rod_bend_energy>(rest_, param_.E, param_.G,
+                                            param_.radius, Vector3d(param_.u0, param_.u1, param_.u2));
   buffer_[2] = make_shared<coupling_energy>(rest_, param_.kappa);
   buffer_[3] = make_shared<rod_fix_vert_energy>(rest_);
   try {

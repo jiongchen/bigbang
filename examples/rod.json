@@ -1,13 +1,14 @@
 {
 	"size": 50,
 	"length": 1.0,
-	"timestep": 0.03,
+	"timestep": 0.08,
 	"radius": 0.01,
 	"density": 1300,
 	"young_modulus": 0.5,
 	"shearing_modulus": 0.5,
 	"stretch_modulus": 20,
 	"spring_const": 100,
+	"intrinsic_bending": [1, 1, 1],
 	
 	"transform": {
 		"scale": 1.0,

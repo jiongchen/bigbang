@@ -92,8 +92,12 @@ int main(int argc, char *argv[])
     json["young_modulus"].asDouble(),
     json["shearing_modulus"].asDouble(),
     json["stretch_modulus"].asDouble(),
-    json["spring_const"].asDouble()
+    json["spring_const"].asDouble(),
+    json["intrinsic_bending"].get((Json::ArrayIndex)0, 0.0).asDouble(),
+    json["intrinsic_bending"].get((Json::ArrayIndex)1, 0.0).asDouble(),
+    json["intrinsic_bending"].get((Json::ArrayIndex)2, 0.0).asDouble()
   };
+  printf("[Info] intrinsic bending and torsion: [%lf, %lf, %f]\n", material.u0, material.u1, material.u2);
 
   cosserat_solver solver(rod, material);
   {
