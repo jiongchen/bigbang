@@ -74,6 +74,12 @@ int main(int argc, char *argv[])
   ifs.close();
   boost::filesystem::create_directories(json["outdir"].asString());
 
+  // write config file first
+  ofstream ofs(json["outdir"].asString()+"/config.json");
+  Json::StyledWriter styledWriter;
+  ofs << styledWriter.write(json) << endl;
+  ofs.close();
+
   Matrix<double, 3, 2> ends = Matrix<double, 3, 2>::Zero();
   ends(0, 1) = json["length"].asDouble();
   Matrix3Xd rod;
@@ -95,17 +101,23 @@ int main(int argc, char *argv[])
     draw_rod(outfile.c_str(), rod);
   }
 
+  // parse transform
+  rod *= json["transform"]["scale"].asDouble();
+  // initialize frame
   Matrix4Xd frm;
   frm.resize(NoChange, rod.cols()-1);
   Matrix3d u0;
   u0 << 0, 0, 1,
       1, 0, 0,
       0, 1, 0;
+  const double frm_cycle = json["frame_cycle"].asDouble();
+  cout << "[Info] frame cycle: " << frm_cycle << endl;
   for (size_t i = 0; i < frm.cols(); ++i) {
-    Matrix3d rot = AngleAxisd(i*M_PI/6, -Vector3d::UnitX()).toRotationMatrix();
+    Matrix3d rot = AngleAxisd(i*frm_cycle*M_PI/(frm.cols()-1), -Vector3d::UnitX()).toRotationMatrix();
     frm.col(i) = Quaterniond(rot*u0).coeffs();
   }
 
+  // init solver
   solver.init_rod(rod, frm);
   {
     string outfile = json["outdir"].asString()+"/init_rod.vtk";
@@ -114,7 +126,17 @@ int main(int argc, char *argv[])
     draw_frame(outfile.c_str(), rod, frm);
   }
 
-  solver.pin_down_vert(0, &rod(0, 0));
+  // parse handles
+  for (int i = 0; i < json["handles"].size(); ++i) {
+    const size_t id = json["handles"][i].asUInt();
+    if ( id >= rod.cols() ) {
+      cerr << "[Error] vert index over range\n";
+      exit(EXIT_FAILURE);
+    }
+    cout << "[Info] pin vertex " << id << endl;
+    solver.pin_down_vert(id, &rod(0, id));
+  }
+
   for (size_t i = 0; i < json["frames"].asUInt(); ++i) {
     cout << "[Info] frame " << i << endl;
     {

@@ -1,16 +1,23 @@
 {
 	"size": 50,
-	"length": 1,
+	"length": 1.0,
 	"timestep": 0.03,
 	"radius": 0.01,
 	"density": 1300,
 	"young_modulus": 0.5,
 	"shearing_modulus": 0.5,
-	"stretch_modulus": 30,
+	"stretch_modulus": 20,
 	"spring_const": 100,
+	
+	"transform": {
+		"scale": 1.0,
+		"translate": [0, 0, 0]
+	},
+	"frame_cycle": 1,
+	"handles": [0],
 
-	"frames": 400,
+	"frames": 2000,
 	"max_iter": 100,
 	"tolerance": 1e-6,
-	"outdir": "./cosserat_rod/"
+	"outdir": "./cosserat_rod_fix_one_ends/"
 }
