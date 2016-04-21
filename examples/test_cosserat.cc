@@ -32,7 +32,7 @@ static int draw_frame(const char *file, const Matrix3Xd &rod, const Matrix4Xd &q
   nods.resize(NoChange, 4*(rod.cols()-1));
   for (size_t i = 0; i < rod.cols()-1; ++i) {
     double len = 0.1;//*(rod.col(i)-rod.col(i+1)).norm();
-    Matrix3d R = Quaternion<double>(q.col(i)).toRotationMatrix();
+    Matrix3d R = Quaterniond(q.col(i)).toRotationMatrix();
     nods.col(4*i+0) = (rod.col(i)+rod.col(i+1))/2;
     nods.col(4*i+1) = nods.col(4*i+0)+R.col(0).normalized()*len;
     nods.col(4*i+2) = nods.col(4*i+0)+R.col(1).normalized()*len;

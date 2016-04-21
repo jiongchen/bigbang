@@ -36,48 +36,48 @@ void generate_rod(const Matrix<double, 3, 2> &ends, const size_t n, Matrix3Xd &r
   }
 }
 
-void init_rod_as_helix(const double radius, const double h, const double omega, const double dt, Matrix3Xd &rod) {
-  double t = 0;
-  for (size_t i = 0; i < rod.cols(); ++i) {
-    rod(0, i) = radius*cos(omega*t);
-    rod(1, i) = radius*sin(omega*t);
-    rod(2, i) = h*t;
-    t += dt;
-  }
-}
+//void init_rod_as_helix(const double radius, const double h, const double omega, const double dt, Matrix3Xd &rod) {
+//  double t = 0;
+//  for (size_t i = 0; i < rod.cols(); ++i) {
+//    rod(0, i) = radius*cos(omega*t);
+//    rod(1, i) = radius*sin(omega*t);
+//    rod(2, i) = h*t;
+//    t += dt;
+//  }
+//}
 
-void init_rod_as_spiral(const double radius, const double omega, const double dt, Matrix3Xd &rod) {
-  double t = 0;
-  for (size_t i = 0; i < rod.cols(); ++i) {
-    rod(0, i) = radius*omega*t*cos(omega*t);
-    rod(1, i) = radius*omega*t*sin(omega*t);
-    rod(2, i) = 0;
-    t += dt;
-  }
-}
+//void init_rod_as_spiral(const double radius, const double omega, const double dt, Matrix3Xd &rod) {
+//  double t = 0;
+//  for (size_t i = 0; i < rod.cols(); ++i) {
+//    rod(0, i) = radius*omega*t*cos(omega*t);
+//    rod(1, i) = radius*omega*t*sin(omega*t);
+//    rod(2, i) = 0;
+//    t += dt;
+//  }
+//}
 
-void compute_bishop_frame(const Matrix3Xd &rod, const Matrix3d &u0, Matrix4Xd &frm) {
-  vector<Matrix3d> U(rod.cols()-1);
-  U.front() = u0;
-  for (size_t i = 1; i < U.size(); ++i) {
-    U[i].col(2) = (rod.col(i+1)-rod.col(i)).normalized();
-  }
-  for (size_t i = 0; i < U.size()-1; ++i) {
-    Vector3d v1 = rod.col(i+1)-rod.col(i);
-    double c1 = v1.dot(v1);
-    Vector3d rL = U[i].col(0)-(2/c1)*v1.dot(U[i].col(0))*v1;
-    Vector3d tL = U[i].col(2)-(2/c1)*v1.dot(U[i].col(2))*v1;
-    Vector3d v2 = U[i+1].col(2)-tL;
-    double c2 = v2.dot(v2);
-    U[i+1].col(0) = rL-(2/c2)*v2.dot(rL)*v2;
-    U[i+1].col(1) = U[i+1].col(2).cross(U[i+1].col(0));
-  }
-  frm.resize(NoChange, U.size());
-  for (size_t i = 0; i < frm.cols(); ++i) {
-    Quaternion<double> q(U[i]);
-    frm.col(i) = q.coeffs();
-  }
-}
+//void compute_bishop_frame(const Matrix3Xd &rod, const Matrix3d &u0, Matrix4Xd &frm) {
+//  vector<Matrix3d> U(rod.cols()-1);
+//  U.front() = u0;
+//  for (size_t i = 1; i < U.size(); ++i) {
+//    U[i].col(2) = (rod.col(i+1)-rod.col(i)).normalized();
+//  }
+//  for (size_t i = 0; i < U.size()-1; ++i) {
+//    Vector3d v1 = rod.col(i+1)-rod.col(i);
+//    double c1 = v1.dot(v1);
+//    Vector3d rL = U[i].col(0)-(2/c1)*v1.dot(U[i].col(0))*v1;
+//    Vector3d tL = U[i].col(2)-(2/c1)*v1.dot(U[i].col(2))*v1;
+//    Vector3d v2 = U[i+1].col(2)-tL;
+//    double c2 = v2.dot(v2);
+//    U[i+1].col(0) = rL-(2/c2)*v2.dot(rL)*v2;
+//    U[i+1].col(1) = U[i+1].col(2).cross(U[i+1].col(0));
+//  }
+//  frm.resize(NoChange, U.size());
+//  for (size_t i = 0; i < frm.cols(); ++i) {
+//    Quaterniond q(U[i]);
+//    frm.col(i) = q.coeffs();
+//  }
+//}
 
 class mass_calculator
 {

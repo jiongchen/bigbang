@@ -130,3 +130,5 @@ target_link_libraries(test_cosserat
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(test_frm_strain_rate test_frm_strain_rate.cc)

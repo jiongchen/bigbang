@@ -1,0 +1,43 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 13.04.2 ] */
+
+/* [wxMaxima: input   start ] */
+load(cj_function);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+helix(s) := block(
+    [x, y, z],
+    x: a*cos(s/sqrt(a^2+b^2)),
+    y: a*sin(s/sqrt(a^2+b^2)),
+    z: b*s/sqrt(a^2+b^2),
+    matrix([x], [y], [z])
+);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+T: diff(helix(s), s);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+N: diff(T, s)/NORM(diff(T, s));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+B: CROSS(T, N);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+kappa: DOT(diff(T, s), N);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+ratsimp(trigsimp(kappa));
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+tau: -DOT(diff(B, s), N);
+/* [wxMaxima: input   end   ] */
+
+/* Maxima can't load/batch files which end with a comment! */
+"Created with wxMaxima"$
