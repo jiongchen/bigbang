@@ -1,0 +1,42 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 13.04.2 ] */
+
+/* [wxMaxima: input   start ] */
+load(cj_function);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+rate(q) := block(
+    [D1, D2, D3, v1, v2, v3],
+    D1: matrix([0, 0, 0, 1], [0, 0, 1, 0], [0, -1, 0, 0], [-1, 0, 0, 0]),
+    D2: matrix([0, 0, -1, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, -1, 0, 0]),
+    D3: matrix([0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1], [0, 0, -1, 0]),
+    v1: DOT(D1.(col(q, 1)+col(q, 2)), col(q, 2)-col(q, 1)),
+    v2: DOT(D2.(col(q, 1)+col(q, 2)), col(q, 2)-col(q, 1)),
+    v3: DOT(D3.(col(q, 1)+col(q, 2)), col(q, 2)-col(q, 1)),
+    matrix([v1], [v2], [v3])
+);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+X: matrix([a1, b1], [a2, b2], [a3, b3], [a4, b4]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+f1: rate(X);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+Y: matrix([a1, -b1], [a2, -b2], [a3, -b3], [a4, -b4]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+f2: rate(Y);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+f1+f2;
+/* [wxMaxima: input   end   ] */
+
+/* Maxima can't load/batch files which end with a comment! */
+"Created with wxMaxima"$

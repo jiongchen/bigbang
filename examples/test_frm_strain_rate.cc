@@ -20,7 +20,7 @@ Matrix3Xd n_u;  // numeric strain rate
 size_t N;
 double a = 0.1;
 double b = 0.2;
-double T = 2*M_PI;
+double T = 6*M_PI;
 
 void init_helix() {
   x.resize(NoChange, N);
@@ -53,6 +53,10 @@ void convert_frame_to_quaternion() {
   q.resize(NoChange, x.cols()-1);
   for (size_t i = 0; i < q.cols(); ++i) {
     q.col(i) = Quaterniond(frm.block<3, 3>(0, 3*i)).coeffs();
+    if ( i >= 1 ) {
+      double cosQ = q.col(i-1).dot(q.col(i));
+      q.col(i) *= cosQ >= 0 ? 1 : -1;
+    }
     printf("%4zu: %16lf %16lf %16lf %16lf\n", i, q(0, i), q(1, i), q(2, i), q(3, i));
   }
   cout << endl;

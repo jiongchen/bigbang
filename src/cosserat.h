@@ -2,7 +2,6 @@
 #define COSSERAT_H
 
 #include <Eigen/Sparse>
-#include <unordered_set>
 #include <memory>
 
 namespace bigbang {
@@ -10,14 +9,14 @@ namespace bigbang {
 /// @brief generate a rod with n vertices
 void generate_rod(const Eigen::Matrix<double, 3, 2> &ends, const size_t n, Eigen::Matrix3Xd &rod);
 
-/// @brief x=R*cos(omega*t), y = R*sin(omega*t), z = h*t
-void init_rod_as_helix(const double radius, const double h, const double omega, const double dt, Eigen::Matrix3Xd &rod);
+///// @brief x=R*cos(omega*t), y = R*sin(omega*t), z = h*t
+//void init_rod_as_helix(const double radius, const double h, const double omega, const double dt, Eigen::Matrix3Xd &rod);
 
-/// @brief x = \rho*\theta*cos(\theta), y = \rho*\theta*sin(\theta), z = 0
-void init_rod_as_spiral(const double radius, const double omega, const double dt, Eigen::Matrix3Xd &rod);
+///// @brief x = \rho*\theta*cos(\theta), y = \rho*\theta*sin(\theta), z = 0
+//void init_rod_as_spiral(const double radius, const double omega, const double dt, Eigen::Matrix3Xd &rod);
 
-/// @brief compute bishop frame
-void compute_bishop_frame(const Eigen::Matrix3Xd &rod, const Eigen::Matrix3d &u0, Eigen::Matrix4Xd &frm);
+///// @brief compute bishop frame
+//void compute_bishop_frame(const Eigen::Matrix3Xd &rod, const Eigen::Matrix3d &u0, Eigen::Matrix4Xd &frm);
 
 template <typename T>
 class Functional;
@@ -57,9 +56,6 @@ private:
   std::shared_ptr<Functional<double>> potential_;
   // material part
   rod_material param_;
-  // numeric part
-  std::unordered_set<size_t> fixDoF_;
-  std::vector<size_t> g2l_;
 };
 
 }
