@@ -79,6 +79,18 @@ void line_bending_(double *val, const double *x, const double *d1, const double 
 void line_bending_jac_(double *jac, const double *x, const double *d1, const double *d2);
 void line_bending_hes_(double *hes, const double *x, const double *d1, const double *d2);
 
+void rod_stretch_(double *val, const double *x, const double *d, const double *Es, const double *r);
+void rod_stretch_jac_(double *jac, const double *x, const double *d, const double *Es, const double *r);
+void rod_stretch_hes_(double *hes, const double *x, const double *d, const double *Es, const double *r);
+
+void rod_bend_(double *val, const double *q, const double *u, const double *d, const double *E, const double *G, const double *r);
+void rod_bend_jac_(double *jac, const double *q, const double *u, const double *d, const double *E, const double *G, const double *r);
+void rod_bend_hes_(double *hes, const double *q, const double *u, const double *d, const double *E, const double *G, const double *r);
+
+void rod_couple_(double *val, const double *xq, const double *d, const double *kappa);
+void rod_couple_jac_(double *jac, const double *xq, const double *d, const double *kappa);
+void rod_couple_hes_(double *hes, const double *xq, const double *d, const double *kappa);
+
 }
 
 typedef double scalarD;
@@ -1484,6 +1496,203 @@ int low_pass_filter_energy::Hes(const double *x, vector<Triplet<double>> *hes) c
 
 void low_pass_filter_energy::Update(const double *ref) {
   ref_ = ref;
+}
+//==============================================================================
+cosserat_stretch_energy::cosserat_stretch_energy(const mati_t &rod, const matd_t &nods,
+                                                 const double Es, const double r, const double w)
+  : rod_(rod), r_size_(nods.size()), q_size_(4*(rod.size()-1)), elem_num_(rod.size()-1), Es_(Es), r_(r), w_(w) {
+  len_ = VectorXd::Zero(elem_num_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    len_(i) = norm(nods(colon(), rod_[i])-nods(colon(), rod_[i+1]));
+  }
+}
+
+size_t cosserat_stretch_energy::Nx() const {
+  return r_size_+q_size_;
+}
+
+int cosserat_stretch_energy::Val(const double *xq, double *val) const {
+  Map<const VectorXd> X(xq, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    Matrix<double, 3, 2> rr;
+    rr.col(0) = X.segment<3>(3*rod_[i]);
+    rr.col(1) = X.segment<3>(3*rod_[i+1]);
+    double value = 0;
+    rod_stretch_(&value, rr.data(), &len_(i), &Es_, &r_);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int cosserat_stretch_energy::Gra(const double *xq, double *gra) const {
+  Map<const VectorXd> X(xq, r_size_+q_size_);
+  Map<VectorXd> G(gra, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    Matrix<double, 3, 2> rr;
+    rr.col(0) = X.segment<3>(3*rod_[i]);
+    rr.col(1) = X.segment<3>(3*rod_[i+1]);
+    Matrix<double, 3, 2> g = Matrix<double, 3, 2>::Zero();
+    rod_stretch_jac_(g.data(), rr.data(), &len_(i), &Es_, &r_);
+    G.segment<3>(3*rod_[i]) += w_*g.col(0);
+    G.segment<3>(3*rod_[i+1]) += w_*g.col(1);
+  }
+  return 0;
+}
+
+int cosserat_stretch_energy::Hes(const double *xq, vector<Triplet<double>> *hes) const {
+  Map<const VectorXd> X(xq, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    Matrix<double, 3, 2> rr;
+    rr.col(0) = X.segment<3>(3*rod_[i]);
+    rr.col(1) = X.segment<3>(3*rod_[i+1]);
+    Matrix<double, 6, 6> H = Matrix<double, 6, 6>::Zero();
+    if ( (rr.col(0)-rr.col(1)).norm() >= len_(i) ) {
+      rod_stretch_hes_(H.data(), rr.data(), &len_(i), &Es_, &r_);
+    } else {
+      double value = 0;
+      rod_stretch_(&value, rr.data(), &len_(i), &Es_, &r_);
+      Matrix<double, 6, 1> g = Matrix<double, 6, 1>::Zero();
+      rod_stretch_jac_(g.data(), rr.data(), &len_(i), &Es_, &r_);
+      g = 0.5*g/sqrt(value);
+      H = 2*g*g.transpose();
+    }
+    for (size_t p = 0; p < 6; ++p) {
+      for (size_t q = 0; q < 6; ++q) {
+        const size_t I = 3*rod_[i+p/3]+p%3;
+        const size_t J = 3*rod_[i+q/3]+q%3;
+        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
+}
+//==============================================================================
+cosserat_bend_energy::cosserat_bend_energy(const mati_t &rod, const matd_t &nods,
+                                           const double E, const double G, const double r, const double w)
+  : rod_(rod), r_size_(nods.size()), q_size_(4*(rod.size()-1)), elem_num_(rod.size()-2), E_(E), G_(G), r_(r), w_(w) {
+  len_ = VectorXd::Zero(elem_num_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    len_(i) = 0.5*(norm(nods(colon(), rod_[i])-nods(colon(), rod_[i+1]))
+        +norm(nods(colon(), rod_[i+1])-nods(colon(), rod_[i+2])));
+  }
+}
+
+size_t cosserat_bend_energy::Nx() const {
+  return r_size_+q_size_;
+}
+
+int cosserat_bend_energy::Val(const double *xq, double *val) const {
+  Map<const VectorXd> X(xq, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    Matrix<double, 4, 2> qq;
+    qq.col(0) = X.segment<4>(r_size_+4*i);
+    qq.col(1) = X.segment<4>(r_size_+4*(i+1));
+    double value = 0;
+    const double uk[3] = {0, 0, 0};
+    rod_bend_(&value, qq.data(), &uk[0], &len_(i), &E_, &G_, &r_);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int cosserat_bend_energy::Gra(const double *xq, double *gra) const {
+  Map<const VectorXd> X(xq, r_size_+q_size_);
+  Map<VectorXd> G(gra, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    Matrix<double, 4, 2> qq;
+    qq.col(0) = X.segment<4>(r_size_+4*i);
+    qq.col(1) = X.segment<4>(r_size_+4*(i+1));
+    Matrix<double, 4, 2> g = Matrix<double, 4, 2>::Zero();
+    const double uk[3] = {0, 0, 0};
+    rod_bend_jac_(g.data(), qq.data(), &uk[0], &len_(i), &E_, &G_, &r_);
+    G.segment<4>(r_size_+4*i) += w_*g.col(0);
+    G.segment<4>(r_size_+4*(i+1)) += w_*g.col(1);
+  }
+  return 0;
+}
+
+int cosserat_bend_energy::Hes(const double *xq, vector<Triplet<double>> *hes) const {
+  Map<const VectorXd> X(xq, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    Matrix<double, 4, 2> qq;
+    qq.col(0) = X.segment<4>(r_size_+4*i);
+    qq.col(1) = X.segment<4>(r_size_+4*(i+1));
+    Matrix<double, 8, 8> H = Matrix<double, 8, 8>::Zero();
+    const double uk[3] = {0, 0, 0};
+    rod_bend_hes_(H.data(), qq.data(), &uk[0], &len_(i), &E_, &G_, &r_);
+    for (size_t p = 0; p < 8; ++p) {
+      for (size_t q = 0; q < 8; ++q) {
+        const size_t I = r_size_+4*(i+p/4)+p%4;
+        const size_t J = r_size_+4*(i+q/4)+q%4;
+        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
+}
+//==============================================================================
+cosserat_couple_energy::cosserat_couple_energy(const mati_t &rod, const matd_t &nods,
+                                               const double kappa, const double w)
+  : rod_(rod), r_size_(nods.size()), q_size_(4*(rod.size()-1)), elem_num_(rod.size()-1), kappa_(kappa), w_(w) {
+  len_ = VectorXd::Zero(elem_num_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    len_(i) = norm(nods(colon(), rod[i])-nods(colon(), rod[i+1]));
+  }
+}
+
+size_t cosserat_couple_energy::Nx() const {
+  return r_size_+q_size_;
+}
+
+int cosserat_couple_energy::Val(const double *xq, double *val) const {
+  Map<const VectorXd> XQ(xq, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    VectorXd rq = VectorXd::Zero(10);
+    rq.segment<3>(0) = XQ.segment<3>(3*rod_[i]);
+    rq.segment<3>(3) = XQ.segment<3>(3*rod_[i+1]);
+    rq.segment<4>(6) = XQ.segment<4>(r_size_+4*i);
+    double value = 0;
+    rod_couple_(&value, rq.data(), &len_(i), &kappa_);
+    *val += w_*value;
+  }
+  return 0;
+}
+
+int cosserat_couple_energy::Gra(const double *xq, double *gra) const {
+  Map<const VectorXd> XQ(xq, r_size_+q_size_);
+  Map<VectorXd> G(gra, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    VectorXd rq = VectorXd::Zero(10);
+    rq.segment<3>(0) = XQ.segment<3>(3*rod_[i]);
+    rq.segment<3>(3) = XQ.segment<3>(3*rod_[i+1]);
+    rq.segment<4>(6) = XQ.segment<4>(r_size_+4*i);
+    VectorXd g = VectorXd::Zero(10);
+    rod_couple_jac_(g.data(), rq.data(), &len_(i), &kappa_);
+    G.segment<3>(3*rod_[i]) += w_*g.segment<3>(0);
+    G.segment<3>(3*rod_[i+1]) += w_*g.segment<3>(3);
+    G.segment<4>(r_size_+4*i) += w_*g.segment<4>(6);
+  }
+  return 0;
+}
+
+int cosserat_couple_energy::Hes(const double *xq, vector<Triplet<double>> *hes) const {
+  Map<const VectorXd> XQ(xq, r_size_+q_size_);
+  for (size_t i = 0; i < elem_num_; ++i) {
+    VectorXd rq = VectorXd::Zero(10);
+    rq.segment<3>(0) = XQ.segment<3>(3*rod_[i]);
+    rq.segment<3>(3) = XQ.segment<3>(3*rod_[i+1]);
+    rq.segment<4>(6) = XQ.segment<4>(r_size_+4*i);
+    Matrix<double, 10, 10> H = Matrix<double, 10, 10>::Zero();
+    rod_couple_hes_(H.data(), rq.data(), &len_(i), &kappa_);
+    for (size_t p = 0; p < 10; ++p) {
+      for (size_t q = 0; q < 10; ++q) {
+        const size_t I = p < 6 ? 3*rod_[i+p/3]+p%3 : r_size_+4*i+p-6;
+        const size_t J = q < 6 ? 3*rod_[i+q/3]+q%3 : r_size_+4*i+q-6;
+        hes->push_back(Triplet<double>(I, J, w_*H(p, q)));
+      }
+    }
+  }
+  return 0;
 }
 //==============================================================================
 }

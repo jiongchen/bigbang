@@ -373,6 +373,60 @@ private:
   std::vector<std::vector<std::pair<size_t, double>>> pat_;
 };
 
+class cosserat_stretch_energy : public Functional<double>
+{
+public:
+  cosserat_stretch_energy(const mati_t &rod, const matd_t &nods,
+                          const double Es, const double r, const double w=1.0);
+  size_t Nx() const;
+  int Val(const double *xq, double *val) const;
+  int Gra(const double *xq, double *gra) const;
+  int Hes(const double *xq, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const mati_t &rod_;
+  const double w_;
+  const size_t r_size_, q_size_;
+  const size_t elem_num_;
+  const double Es_, r_;
+  Eigen::VectorXd len_;
+};
+
+class cosserat_bend_energy : public Functional<double>
+{
+public:
+  cosserat_bend_energy(const mati_t &rod, const matd_t &nods,
+                       const double E, const double G, const double r, const double w=1.0);
+  size_t Nx() const;
+  int Val(const double *xq, double *val) const;
+  int Gra(const double *xq, double *gra) const;
+  int Hes(const double *xq, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const mati_t &rod_;
+  const double w_;
+  const size_t r_size_, q_size_;
+  const size_t elem_num_;
+  const double E_, G_, r_;
+  Eigen::VectorXd len_;
+};
+
+class cosserat_couple_energy : public Functional<double>
+{
+public:
+  cosserat_couple_energy(const mati_t &rod, const matd_t &nods,
+                         const double kappa, const double w=1.0);
+  size_t Nx() const;
+  int Val(const double *xq, double *val) const;
+  int Gra(const double *xq, double *gra) const;
+  int Hes(const double *xq, std::vector<Eigen::Triplet<double>> *hes) const;
+private:
+  const mati_t &rod_;
+  const double w_;
+  const size_t r_size_, q_size_;
+  const size_t elem_num_;
+  const double kappa_;
+  Eigen::VectorXd len_;
+};
+
 }
 
 #endif

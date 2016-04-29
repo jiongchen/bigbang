@@ -132,3 +132,9 @@ target_link_libraries(test_cosserat
 )
 
 add_executable(test_frm_strain_rate test_frm_strain_rate.cc)
+
+add_executable(test_hybrid_stitch test_hybrid_stitch.cc)
+target_link_libraries(test_hybrid_stitch
+    bigbang
+    ${Boost_LIBRARIES}
+)

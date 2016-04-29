@@ -1,0 +1,22 @@
+{
+	"cloth": {
+		"mesh": "../../dat/plane.obj",
+		"handles": [0, 1],
+		"stretch": 1e3,
+		"bend": 1e-2,	
+		"position": 1e3
+	},
+	"stitch": {
+		"chain": [19, 371, 163, 579, 51, 523, 107, 315, 8, 
+		320, 112, 528, 56, 584, 168, 376, 24],
+		"radius": 0.01,
+		"young": 0.5,
+		"shear": 0.5,
+		"stretch": 20,
+		"spring": 100
+	},
+	"density": 10,	
+	"timestep": 0.01,
+	"frames": 150,
+	"outdir": "./cosserat_stitch"
+}
