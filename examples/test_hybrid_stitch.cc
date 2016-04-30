@@ -63,22 +63,56 @@ static void advance(VectorXd &xn, VectorXd &vn) {
   xn = xstar;
 }
 
+static int draw_frame(const char *file, const mati_t &rod, const double *x) {
+  if ( g_frm_size == 0 )
+    return __LINE__;
+  Map<const VectorXd> xn(x, g_node_size+g_frm_size);
+  Matrix<size_t, 2, -1> cell;
+  cell.resize(NoChange, 3*(rod.size()-1));
+  Matrix<double, 3, -1> nods;
+  nods.resize(NoChange, 4*(rod.size()-1));
+  for (size_t i = 0; i < rod.size()-1; ++i) {
+    double len = 0.1;//*(rod.col(i)-rod.col(i+1)).norm();
+    Matrix3d R = Quaterniond(xn.segment<4>(g_node_size+4*i)).toRotationMatrix();
+    nods.col(4*i+0) = (xn.segment<3>(3*rod[i])+xn.segment<3>(3*rod[i+1]))/2;
+    nods.col(4*i+1) = nods.col(4*i+0)+R.col(0).normalized()*len;
+    nods.col(4*i+2) = nods.col(4*i+0)+R.col(1).normalized()*len;
+    nods.col(4*i+3) = nods.col(4*i+0)+R.col(2).normalized()*len;
+  }
+  for (size_t i = 0; i < rod.size()-1; ++i) {
+    cell(0, 3*i+0) = 4*i+0;
+    cell(1, 3*i+0) = 4*i+1;
+    cell(0, 3*i+1) = 4*i+0;
+    cell(1, 3*i+1) = 4*i+2;
+    cell(0, 3*i+2) = 4*i+0;
+    cell(1, 3*i+2) = 4*i+3;
+  }
+  ofstream ofs(file);
+  if ( ofs.fail() )
+    return __LINE__;
+  line2vtk(ofs, nods.data(), nods.cols(), cell.data(), cell.cols());
+  ofs.close();
+  return 0;
+}
+
 class MassCalculator
 {
 public:
   MassCalculator(const mati_t &tris, const mati_t &rod, const matd_t &nods,
                  const double rho, const double r)
-    : r_size_(nods.size()), q_size_(4*(rod.size()-1)), I_(3), B_(3) {
+    : r_size_(nods.size()), I_(3), B_(3) {
     for (size_t i = 0; i < tris.size(2); ++i) {
       const double mas = rho*jtf::mesh::cal_face_area(nods(colon(), tris(colon(), i)));
       add_diag_block<double, 3>(tris(0, i), tris(0, i), mas/3, &tripsA_);
       add_diag_block<double, 3>(tris(1, i), tris(1, i), mas/3, &tripsA_);
       add_diag_block<double, 3>(tris(2, i), tris(2, i), mas/3, &tripsA_);
     }
-    lenq_ = VectorXd::Zero(rod.size()-2);
-    for (size_t i = 0; i < lenq_.size(); ++i) {
-      lenq_(i) = 0.5*(norm(nods(colon(), rod[i])-nods(colon(), rod[i+1]))+
-          norm(nods(colon(), rod[i+1])-nods(colon(), rod[i+2])));
+    if ( rod.size() >= 3 ) {
+      lenq_ = VectorXd::Zero(rod.size()-2);
+      for (size_t i = 0; i < lenq_.size(); ++i) {
+        lenq_(i) = 0.5*(norm(nods(colon(), rod[i])-nods(colon(), rod[i+1]))+
+            norm(nods(colon(), rod[i+1])-nods(colon(), rod[i+2])));
+      }
     }
     I_[0] = I_[1] = rho*M_PI*r*r/4.0;
     I_[2] = 2*I_[0];
@@ -113,7 +147,7 @@ public:
     M.setFromTriplets(trips.begin(), trips.end());
   }
 private:
-  const size_t r_size_, q_size_;
+  const size_t r_size_;
   VectorXd lenq_;
   vector<double> I_;
   vector<Matrix4d> B_;
@@ -149,33 +183,36 @@ int main(int argc, char *argv[])
   Json::Value &clothJson = json["cloth"];
   Json::Value &rodJson = json["stitch"];
 
+  g_buffer.resize(7);
+
   mati_t tris, edges, diams; matd_t nods; {
     jtf::mesh::load_obj(clothJson["mesh"].asString().c_str(), tris, nods);
     get_edge_elem(tris, edges);
     get_diam_elem(tris, diams);
+    g_buffer[0] = make_shared<spring_potential>(edges, nods, clothJson["stretch"].asDouble());
+    g_buffer[1] = make_shared<isometric_bending>(diams, nods, clothJson["bend"].asDouble());
+    g_buffer[2] = make_shared<gravitational_potential>(tris, nods, json["density"].asDouble(), 1.0);
+    g_buffer[3] = make_shared<positional_potential>(nods, clothJson["position"].asDouble());
   }
   mati_t rod; matd_t frm; {
-    rod.resize(rodJson["chain"].size());
-    for (int i = 0; i < rodJson["chain"].size(); ++i)
-      rod[i] = rodJson["chain"][i].asUInt();
-    frm.resize(4, rod.size()-1);
-    for (size_t i = 0; i < frm.size(2); ++i) {
-      Matrix3d basis;
-      basis.col(2) = -Vector3d::UnitX();
-      basis.col(0) = Vector3d::UnitY();
-      basis.col(1) = basis.col(2).cross(basis.col(0));
-      Map<Vector4d>(&frm(0, i)) = Quaterniond(basis).coeffs();
+    if ( rodJson["chain"].size() >= 3 ) {
+      rod.resize(rodJson["chain"].size());
+      for (int i = 0; i < rodJson["chain"].size(); ++i)
+        rod[i] = rodJson["chain"][i].asUInt();
+      frm.resize(4, rod.size()-1);
+      for (size_t i = 0; i < frm.size(2); ++i) {
+        Matrix3d basis;
+        basis.col(2) = -Vector3d::UnitX();
+        basis.col(0) = Vector3d::UnitY();
+        basis.col(1) = basis.col(2).cross(basis.col(0));
+        Matrix3d rot = AngleAxisd(i*M_PI/(frm.size(2)-1), Vector3d::UnitX()).toRotationMatrix();
+        Map<Vector4d>(&frm(0, i)) = Quaterniond(rot*basis).coeffs();
+      }
+      g_buffer[4] = make_shared<cosserat_stretch_energy>(rod, nods, rodJson["stretch"].asDouble(), rodJson["radius"].asDouble());
+      g_buffer[5] = make_shared<cosserat_bend_energy>(rod, nods, rodJson["young"].asDouble(), rodJson["shear"].asDouble(), rodJson["radius"].asDouble());
+      g_buffer[6] = make_shared<cosserat_couple_energy>(rod, nods, rodJson["spring"].asDouble());
     }
   }
-
-  g_buffer.resize(7);
-  g_buffer[0] = make_shared<spring_potential>(edges, nods, clothJson["stretch"].asDouble());
-  g_buffer[1] = make_shared<isometric_bending>(diams, nods, clothJson["bend"].asDouble());
-  g_buffer[2] = make_shared<gravitational_potential>(tris, nods, json["density"].asDouble(), 1.0);
-  g_buffer[3] = make_shared<positional_potential>(nods, clothJson["position"].asDouble());
-  g_buffer[4] = make_shared<cosserat_stretch_energy>(rod, nods, rodJson["stretch"].asDouble(), rodJson["radius"].asDouble());
-  g_buffer[5] = make_shared<cosserat_bend_energy>(rod, nods, rodJson["young"].asDouble(), rodJson["shear"].asDouble(), rodJson["radius"].asDouble());
-  g_buffer[6] = make_shared<cosserat_couple_energy>(rod, nods, rodJson["spring"].asDouble());
 
   // fix handle nodes
   for (int i = 0; i < clothJson["handles"].size(); ++i) {
@@ -186,9 +223,9 @@ int main(int argc, char *argv[])
   g_h = json["timestep"].asDouble();
   g_node_size = nods.size();
   g_frm_size = frm.size();
+  cout << "[Info] frame size: " << g_frm_size/4 << endl;
 
   MassCalculator mc(tris, rod, nods, json["density"].asDouble(), rodJson["radius"].asDouble());
-  ASSERT(g_node_size+g_frm_size == g_buffer.back()->Nx());
   VectorXd vn = VectorXd::Zero(g_node_size+g_frm_size), xn(g_node_size+g_frm_size);
   std::copy(nods.begin(), nods.end(), xn.data());
   std::copy(frm.begin(), frm.end(), xn.data()+g_node_size);
@@ -196,10 +233,12 @@ int main(int argc, char *argv[])
     cout << "[Info] frame " << frm << endl;
     {
       char outfile[256];
-      sprintf(outfile, "%s/frame_%zu.vtk", json["outdir"].asString().c_str(), frm);
+      sprintf(outfile, "%s/sim_%zu.vtk", json["outdir"].asString().c_str(), frm);
       ofstream ofs(outfile);
       tri2vtk(ofs, xn.data(), nods.size(2), &tris[0], tris.size(2));
       ofs.close();
+      sprintf(outfile, "%s/frm_%zu.vtk", json["outdir"].asString().c_str(), frm);
+      draw_frame(outfile, rod, xn.data());
     }
     mc.mass_matrix(xn, g_M);
     advance(xn, vn);
