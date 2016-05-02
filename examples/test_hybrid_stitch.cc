@@ -202,10 +202,10 @@ int main(int argc, char *argv[])
       frm.resize(4, rod.size()-1);
       for (size_t i = 0; i < frm.size(2); ++i) {
         Matrix3d basis;
-        basis.col(2) = -Vector3d::UnitX();
+        basis.col(2) = -Vector3d::UnitZ();
         basis.col(0) = Vector3d::UnitY();
         basis.col(1) = basis.col(2).cross(basis.col(0));
-        Matrix3d rot = AngleAxisd(i*M_PI/(frm.size(2)-1), Vector3d::UnitX()).toRotationMatrix();
+        Matrix3d rot = /*Matrix3d::Identity(); //*/AngleAxisd(i*M_PI/(frm.size(2)-1), Vector3d::UnitZ()).toRotationMatrix();
         Map<Vector4d>(&frm(0, i)) = Quaterniond(rot*basis).coeffs();
       }
       g_buffer[4] = make_shared<cosserat_stretch_energy>(rod, nods, rodJson["stretch"].asDouble(), rodJson["radius"].asDouble());
