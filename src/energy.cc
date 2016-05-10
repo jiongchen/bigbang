@@ -936,8 +936,16 @@ int surf_bending_potential::Hes(const double *x, vector<Triplet<double>> *hes) c
   itr_matrix<const double *> X(3, Nx()/3, x);
   for (size_t i = 0; i < diams_.size(2); ++i) {
     matd_t vert = X(colon(), diams_(colon(), i));
-    matd_t H = zeros<double>(12, 12);
-    surf_bending_hes_(&H[0], &vert[0], &angle_[i], &len_[i], &area_[i]);
+    Matrix<double, 12, 12> H = Matrix<double, 12, 12>::Zero();
+//    {
+//      double value = 0;
+//      surf_bending_(&value, &vert[0], &angle_[i], &len_[i], &area_[i]);
+//      Matrix<double, 12, 1> g = Matrix<double, 12, 1>::Zero();
+//      surf_bending_jac_(g.data(), &vert[0], &angle_[i], &len_[i], &area_[i]);
+//      g = 0.5*g/sqrt(value);
+//      H = 2*g*g.transpose();
+//    }
+    surf_bending_hes_(H.data(), &vert[0], &angle_[i], &len_[i], &area_[i]);
     for (size_t p = 0; p < 12; ++p) {
       for (size_t q = 0; q < 12; ++q) {
         if ( H(p, q) != 0.0 ) {

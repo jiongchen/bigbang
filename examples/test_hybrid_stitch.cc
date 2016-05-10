@@ -27,7 +27,7 @@ static void advance(VectorXd &xn, VectorXd &vn) {
   const size_t dim = xn.size();
   SimplicialCholesky<SparseMatrix<double>> solver;
   VectorXd xstar = xn;
-  for (size_t iter = 0; iter < 50; ++iter) {
+  for (size_t iter = 0; iter < 20; ++iter) {
     double value = 0; {
       if ( iter % 10 == 0 ) {
         for (auto &energy : g_buffer)
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
         basis.col(2) = -Vector3d::UnitZ();
         basis.col(0) = Vector3d::UnitY();
         basis.col(1) = basis.col(2).cross(basis.col(0));
-        Matrix3d rot = /*Matrix3d::Identity(); //*/AngleAxisd(i*M_PI/(frm.size(2)-1), Vector3d::UnitZ()).toRotationMatrix();
+        Matrix3d rot = Matrix3d::Identity(); //AngleAxisd(i*M_PI/(frm.size(2)-1), Vector3d::UnitZ()).toRotationMatrix();
         Map<Vector4d>(&frm(0, i)) = Quaterniond(rot*basis).coeffs();
       }
       g_buffer[4] = make_shared<cosserat_stretch_energy>(rod, nods, rodJson["stretch"].asDouble(), rodJson["radius"].asDouble());
