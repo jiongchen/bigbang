@@ -604,8 +604,8 @@ int positional_potential::Release(const size_t id) {
 }
 
 //==============================================================================
-spring_potential::spring_potential(const mati_t &edge, const matd_t &nods, const double w)
-  : dim_(nods.size()), edge_(edge) {
+spring_potential::spring_potential(const mati_t &edge, const matd_t &nods, const double w, char option)
+  : dim_(nods.size()), edge_(edge), option_(option) {
   len_.resize(edge_.size(2), 1);
 #pragma omp parallel for
   for (size_t i = 0; i < edge_.size(2); ++i) {
@@ -644,28 +644,43 @@ int spring_potential::Gra(const double *x, double *gra) const {
   return 0;
 }
 
+void spring_potential::Newton(const matd_t &vert, const double &rest_len, matd_t &H) const {
+  mass_spring_hes_(&H[0], &vert[0], &rest_len);
+}
+
+void spring_potential::GaussNewton(const matd_t &vert, const double &rest_len, matd_t &H) const {
+  matd_t g = zeros<double>(6, 1);
+  double energy = 0;
+  mass_spring_(&energy, &vert[0], &rest_len);
+  if ( energy < 1e-16 ) {
+    calc_edge_length_jac_(&g[0], &vert[0]);
+    g /= sqrt(rest_len);
+  } else {
+    mass_spring_jac_(&g[0], &vert[0], &rest_len);
+    g /= 2*sqrt(energy);
+  }
+  H = 2*g*trans(g);
+}
+
+void spring_potential::Mixed(const matd_t &vert, const double &rest_len, matd_t &H) const {
+  double curr_length = 0.0;
+  calc_edge_length_(&curr_length, &vert[0]);
+  if ( curr_length < rest_len )
+    GaussNewton(vert, rest_len, H);
+  else
+    Newton(vert, rest_len, H);
+}
+
 int spring_potential::Hes(const double *x, vector<Triplet<double>> *hes) const {
   RETURN_WITH_COND_TRUE(max(w_) == 0.0);
   itr_matrix<const double *> X(3, dim_/3, x);
   for (size_t i = 0; i < edge_.size(2); ++i) {
     matd_t vert = X(colon(), edge_(colon(), i));
     matd_t H = zeros<double>(6, 6);
-    double curr = 0;
-    calc_edge_length_(&curr, &vert[0]);
-    if ( curr < len_[i] ) {
-      matd_t g = zeros<double>(6, 1);
-      double energy = 0;
-      mass_spring_(&energy, &vert[0], &len_[i]);
-      if ( energy < 1e-16 ) {
-        calc_edge_length_jac_(&g[0], &vert[0]);
-        g /= sqrt(len_[i]);
-      } else {
-        mass_spring_jac_(&g[0], &vert[0], &len_[i]);
-        g /= 2*sqrt(energy);
-      }
-      H = 2*g*trans(g);
-    } else {
-      mass_spring_hes_(&H[0], &vert[0], &len_[i]);
+    switch ( option_ ) {
+      case 'N': Newton(vert, len_[i], H); break;
+      case 'G': GaussNewton(vert, len_[i], H); break;
+      case 'M': Mixed(vert, len_[i], H); break;
     }
     for (size_t p = 0; p < 6; ++p) {
       for (size_t q = 0; q < 6; ++q) {

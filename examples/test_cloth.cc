@@ -31,7 +31,7 @@ struct argument {
 };
 }
 
-static opt_args optparam = {1000, 1e-8, false};
+static opt_args optparam = {200, 1e-8, false};
 
 #define APPLY_FORCE(frame, id, f)                                     \
   if ( i == frame )                                                   \
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
   };
 
   if ( !boost::filesystem::exists(args.output_folder) )
-    boost::filesystem::create_directory(args.output_folder);
+    boost::filesystem::create_directories(args.output_folder);
 
   // load input
   mati_t tris; matd_t nods;
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
   ebf[0] = make_shared<momentum_potential_imp_euler>(tris, nods, args.density, args.timestep, 1e0);
   switch ( args.bw98 ) {
     case 0:
-      ebf[1] = make_shared<spring_potential>(edges, nods, args.ws);
+      ebf[1] = make_shared<spring_potential>(edges, nods, args.ws, 'M');
       break;
     default:
       ebf[1] = make_shared<bw98_stretch_energy>(tris, nods, args.ws);
@@ -127,15 +127,16 @@ int main(int argc, char *argv[])
   }
 
   char outfile[256];
-  double f[3] = {-200, 0, -200};
+  const double force_intensity = 200;
+  double f[3] = {-force_intensity, 0, -force_intensity};
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
     sprintf(outfile, "%s/frame_%zu.vtk", args.output_folder.c_str(), i);
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
 
-//    APPLY_FORCE(0, 3, f);
-//    REMOVE_FORCE(40, 3);
+    APPLY_FORCE(0, 3, f);
+    REMOVE_FORCE(40, 3);
     RELEASE_VERT(160, 2);
 
     newton_solve(&nods[0], nods.size(), energy, optparam);

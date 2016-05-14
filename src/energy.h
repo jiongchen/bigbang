@@ -151,7 +151,7 @@ private:
 class spring_potential : public Functional<double>
 {
 public:
-  spring_potential(const mati_t &edge, const matd_t &nods, const double w);
+  spring_potential(const mati_t &edge, const matd_t &nods, const double w, char option='M');
   size_t Nx() const;
   int Val(const double *x, double *val) const;
   int Gra(const double *x, double *gra) const;
@@ -159,10 +159,15 @@ public:
   void ResetWeight(const double w) { w_ = w; }
   int ResetEdgeMaterial(const size_t p, const size_t q, const double scale_w, const double scale_len);
 private:
+  void Newton(const matd_t &vert, const double &rest_len, matd_t &H) const;
+  void GaussNewton(const matd_t &vert, const double &rest_len, matd_t &H) const;
+  void Mixed(const matd_t &vert, const double &rest_len, matd_t &H) const;
+private:
   const size_t dim_;
   matd_t w_;
   const mati_t &edge_;
   matd_t len_;
+  char option_;
 };
 
 class gauss_newton_spring : public Functional<double>
