@@ -121,6 +121,25 @@ block(
   return()
 )$
 
+block(
+  [X, d1, d2],
+  X: genmatrix(X, 3, 3),
+  d1: genmatrix(d1, 1, 1),
+  d2: genmatrix(d2, 1, 1),
+  
+  curve_bending(X, d1, d2) := block(
+    [e1, e2, Kb, rtn],
+    e1: col(X, 1)-col(X, 2),
+    e2: col(X, 2)-col(X, 3),
+    Kb: 2*CROSS(e1, e2)/(d1[1,1]*d2[1,1]+DOT(e1, e2)),
+    rtn: DOT(Kb, Kb)/(d1[1,1]+d2[1,1]),
+    matrix([rtn])
+  ),
+  with_stdout(f, val_jac_hes_to_f90(curve_bending, [X, d1, d2])),
+  
+  return()
+)$
+
 /* 3D elasticity */
 block(
   [X, D, volume, lam, miu],

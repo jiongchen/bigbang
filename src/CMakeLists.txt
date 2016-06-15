@@ -42,6 +42,7 @@ endif(CUDA_FOUND)
 add_library(bigbang SHARED ${source} jsoncpp.cpp potential.f90 pbd_cons.f90 elasticity.f90 cosserat_rod.f90 nnls.c)
 target_link_libraries(bigbang
     jtf-mesh
+    ${SuiteSparse_LIBRARIES}
     ${UMFPACK_LIBRARIES}
     HLBFGS
     ${LBFGS_LIBRARIES}

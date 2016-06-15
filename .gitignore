@@ -1,6 +1,8 @@
 /build
+/result
 *.user
 *.user.*
+*~
 /doc
 /tmp
 /script/*

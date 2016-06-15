@@ -138,3 +138,9 @@ target_link_libraries(test_hybrid_stitch
     bigbang
     ${Boost_LIBRARIES}
 )
+
+add_executable(main_catenary_dyn main_catenary_dyn.cc)
+target_link_libraries(main_catenary_dyn
+  bigbang
+  ${Boost_LIBRARIES}
+)
