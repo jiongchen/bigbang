@@ -85,9 +85,8 @@ int dump_catenary(const char *filename, const catenary *ins) {
 catenary_strain::catenary_strain(const catenary *ins, const double w)
     : w_(w), dim_(ins->pos.size()) {
   len_ = VectorXd::Zero(ins->vert_num-1);
-  for (size_t i = 0; i < ins->vert_num-1; ++i) {
+  for (size_t i = 0; i < len_.size(); ++i)
     len_[i] = (ins->pos.segment<3>(3*i)-ins->pos.segment<3>(3*i+3)).norm();
-  }
 }
 
 size_t catenary_strain::Nx() const {
@@ -153,7 +152,7 @@ int catenary_strain::Hes(const double *x, vector<Triplet<double>> *hes) const {
 catenary_bending::catenary_bending(const catenary *ins, const double w)
     : w_(w), dim_(ins->pos.size()) {
   len_ = VectorXd::Zero(ins->vert_num-1);
-  for (size_t i = 0; i < ins->vert_num-1; ++i)
+  for (size_t i = 0; i < len_.size(); ++i)
     len_[i] = (ins->pos.segment<3>(3*i)-ins->pos.segment<3>(3*i+3)).norm();
 }
 

@@ -46,7 +46,7 @@ static void advance() {
     const double xnorm = xstar.norm();
     xstar += dx;
     if ( dx.norm() <= g_tolerance*xnorm ) {
-      cout << "\t@converged after " << iter+1 << "-th iterations\n";
+      cout << "\t@converged after " << iter+1 << " iterations\n";
       break;
     }
   }
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     const size_t idx = g_ins->vert_num-1;
     const Vector3d x0 = g_ins->pos.segment<3>(3*idx);
     shared_ptr<handle_move> han =
-        make_shared<vertical_sine_move>(x0, timer, timer, M_PI/8.0/g_h, 0.2);
+        make_shared<vertical_sine_move>(x0, timer, timer, M_PI/16.0/g_h, 0.2);
     dynamic_pointer_cast<catenary_handle>(buffer[3])->PinDown(idx, han);
   }
   
