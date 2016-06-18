@@ -1,7 +1,7 @@
 enable_language(Fortran)
 
 file(GLOB header *.h)
-file(GLOB source *.cc)
+file(GLOB source *.cc *.c)
 
 set(SRC_DIR "{${CMAKE_CURRENT_SOURCE_DIR}}")
 

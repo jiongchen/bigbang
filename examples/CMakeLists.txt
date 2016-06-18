@@ -144,3 +144,9 @@ target_link_libraries(main_catenary_dyn
   bigbang
   ${Boost_LIBRARIES}
 )
+
+add_executable(main_example_elastic main_example_elastic.cc)
+target_link_libraries(main_example_elastic
+  bigbang
+  ${Boost_LIBRARIES}
+)

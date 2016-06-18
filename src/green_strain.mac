@@ -1,0 +1,25 @@
+load(cj_function)$
+load(f90)$
+
+/* x: current configuration */
+/* X: rest configuration    */
+green_strain(x, X) := block(
+  [Ds, Dm, F, E],
+  Ds: addcol(col(x,2)-col(x,1), col(x,3)-col(x,1), col(x,4)-col(x,1)),
+  Dm: addcol(col(X,2)-col(X,1), col(X,3)-col(X,1), col(X,4)-col(X,1)),
+  Dm: ratsimp(invert(Dm)),
+  F: Ds.Dm,
+  E: 0.5*(transpose(F).F-ident(3)),
+  matrix([E[1,1]], [E[2,2]], [E[3,3]], [E[2,3]], [E[1,3]], [E[1,2]])
+)$
+
+rest: matrix([Rx1, Rx2, Rx3, Rx4], [Ry1, Ry2, Ry3, Ry4], [Rz1, Rz2, Rz3, Rz4])$
+curr: matrix([Cx1, Cx2, Cx3, Cx4], [Cy1, Cy2, Cy3, Cy4], [Cz1, Cz2, Cz3, Cz4])$
+
+E: FLATTEN(ratsimp(green_strain(curr, rest)))$
+gE_rest: FLATTEN(GRAD(E, rest))$
+gE_curr: FLATTEN(GRAD(E, curr))$
+
+/* f90(optimize(E)); */
+f90(optimize(gE_rest));
+/* f90(optimize(gE_curr)); */
