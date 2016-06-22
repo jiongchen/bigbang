@@ -1,19 +1,18 @@
 #!/bin/bash
 
-exe=../build/bin/test_proj_dyn
-mesh=../dat/plane.obj
-cons=../dat/plane_fixed_2.fv
-outfolder=../build/bin/proj_dyn/JTS
+EXE=../build/bin/test_proj_dyn
+MESH=../dat/plane.obj
+CONS=../dat/plane_fixed_2.fv
+FRAMES=300
+METHOD=0
+TIMESTEP=0.033
+WS=1e3
+WB=1e-2
+MAXITER=5000
+OUTDIR=../result/projective/ms-method$METHOD-t$TIMESTEP-ws$WS-wb$WB
 
-if [ ! -e "$exe" ]; then
-  echo executable binary not exists!
-  exit 1
-elif [ ! -e "$mesh" ]; then
-  echo mesh not exists!
-  exit 1
+if [ ! -d "$OUTDIR" ]; then
+  mkdir -p $OUTDIR
 fi
 
-if [ ! -d "$outfolder" ]; then
-  mkdir -p $outfolder
-fi
-time $exe -i $mesh -c $cons -o $outfolder -t 0.033 --wb 0.01 --method $1 -m 25000 -n 100 --spectral_radius 0.9995
+$EXE -i $MESH -c $CONS -o $OUTDIR -t $TIMESTEP --ws $WS --wb $WB --method $METHOD -n $FRAMES -m $MAXITER | tee $OUTDIR/log.txt

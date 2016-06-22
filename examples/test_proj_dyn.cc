@@ -41,20 +41,20 @@ int main(int argc, char *argv[])
   po::options_description desc("Available options");
   desc.add_options()
       ("help,h", "produce help message")
-      ("input_mesh,i", po::value<string>(), "set the input mesh")
-      ("input_cons,c", po::value<string>(), "set the input positional constraints")
-      ("output_folder,o", po::value<string>(), "set the output folder")
-      ("total_frame,n", po::value<size_t>()->default_value(300), "set the frame number")
+      ("input_mesh,i", po::value<string>(), "input mesh")
+      ("input_cons,c", po::value<string>(), "input positional constraints")
+      ("output_folder,o", po::value<string>(), "output folder")
+      ("frames,n", po::value<size_t>()->default_value(300), "frame number")
       ("method", po::value<int>()->default_value(0), "choose the method")
-      ("spectral_radius", po::value<double>()->default_value(0.0), "set the spectral radius")
-      ("density,d", po::value<double>()->default_value(1.0), "set the density")
-      ("timestep,t", po::value<double>()->default_value(0.01), "set the timestep")
-      ("maxiter,m", po::value<size_t>()->default_value(10000), "set the maximum iteration")
-      ("tolerance,e", po::value<double>()->default_value(1e-8), "set the tolerance")
-      ("ws", po::value<double>()->default_value(1e4), "set the stretch weight")
-      ("wb", po::value<double>()->default_value(1e0), "set the bending weight")
-      ("wg", po::value<double>()->default_value(1.0), "set the gravity weight")
-      ("wp", po::value<double>()->default_value(1e3), "set the position weight")
+      ("spectral_radius", po::value<double>()->default_value(0.0), "spectral radius")
+      ("density,d", po::value<double>()->default_value(1.0), "density")
+      ("timestep,t", po::value<double>()->default_value(0.01), "timestep")
+      ("maxiter,m", po::value<size_t>()->default_value(10000), "maximum iteration")
+      ("tolerance,e", po::value<double>()->default_value(1e-8), "converge tolerance")
+      ("ws", po::value<double>()->default_value(1e4), "stretch weight")
+      ("wb", po::value<double>()->default_value(1e0), "bending weight")
+      ("wg", po::value<double>()->default_value(1.0), "gravity weight")
+      ("wp", po::value<double>()->default_value(1e3), "position weight")
       ;
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     args.input_mesh = vm["input_mesh"].as<string>();
     args.input_cons = vm["input_cons"].as<string>();
     args.output_folder = vm["output_folder"].as<string>();
-    args.total_frame = vm["total_frame"].as<size_t>();
+    args.total_frame = vm["frames"].as<size_t>();
     args.proj_args.rho = vm["density"].as<double>();
     args.proj_args.h = vm["timestep"].as<double>();
     args.proj_args.maxiter = vm["maxiter"].as<size_t>();
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
   }
 
   if ( !boost::filesystem::exists(args.output_folder) )
-    boost::filesystem::create_directory(args.output_folder);
+    boost::filesystem::create_directories(args.output_folder);
 
   // load input
   mati_t tris; matd_t nods;
@@ -104,22 +104,21 @@ int main(int argc, char *argv[])
   double f[3] = {-200, 0, -200};
   for (size_t i = 0; i < args.total_frame; ++i) {
     cout << "[info] frame " << i << endl;
-    sprintf(outfile, "%s/frame_method%d_ws%.1e_wb%.1e_wg%.1e_wp%.1e_m%zu_%zu.vtk",
-            args.output_folder.c_str(), args.proj_args.method, args.proj_args.ws, args.proj_args.wb,
-            args.proj_args.wg, args.proj_args.wp, args.proj_args.maxiter, i);
+    sprintf(outfile, "%s/frm_%04zu.vtk", args.output_folder.c_str(), i);
     ofstream os(outfile);
     tri2vtk(os, &nods[0], nods.size(2), &tris[0], tris.size(2));
-
+    os.close();
+    
 //    APPLY_FORCE(0, 3, f);
 //    REMOVE_FORCE(40, 3);
 //    RELEASE_VERT(160, 2);
 
     solver.advance(&nods[0]);
 
-    sprintf(outfile, "%s/rotation_method%d_frame%zu.vtk", args.output_folder.c_str(), args.proj_args.method, i);
-    solver.vis_rot(outfile);
-    sprintf(outfile, "%s/trajectory_method%d_frame%zu.vtk", args.output_folder.c_str(), args.proj_args.method, i);
-    solver.draw_trajectory(outfile);
+    // sprintf(outfile, "%s/rotation_method%d_frame%zu.vtk", args.output_folder.c_str(), args.proj_args.method, i);
+    // solver.vis_rot(outfile);
+    // sprintf(outfile, "%s/trajectory_method%d_frame%zu.vtk", args.output_folder.c_str(), args.proj_args.method, i);
+    // solver.draw_trajectory(outfile);
   }
 
   cout << "[info] all done\n";
